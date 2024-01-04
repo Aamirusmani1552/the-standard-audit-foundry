@@ -1,66 +1,39 @@
-## Foundry
+## How to set up the Project
 
-**Foundry is a blazing fast, portable and modular toolkit for Ethereum application development written in Rust.**
+### Step 1
 
-Foundry consists of:
+Install foundry by following the steps mentioned here 👉 [foundry.bool](https://book.getfoundry.sh/getting-started/installation)
 
--   **Forge**: Ethereum testing framework (like Truffle, Hardhat and DappTools).
--   **Cast**: Swiss army knife for interacting with EVM smart contracts, sending transactions and getting chain data.
--   **Anvil**: Local Ethereum node, akin to Ganache, Hardhat Network.
--   **Chisel**: Fast, utilitarian, and verbose solidity REPL.
+### Step 2
 
-## Documentation
+Clone the Repo by using following command:
 
-https://book.getfoundry.sh/
-
-## Usage
-
-### Build
-
-```shell
-$ forge build
+```bash
+    git clone https://github.com/Aamirusmani1552/the-standard-audit-foundry
 ```
 
-### Test
+### Step 3
 
-```shell
-$ forge test
+Install the dependencies by using following command:
+
+```bash
+    forge install
 ```
 
-### Format
+If the command is not working means something has been changed in foundry, please go to this link to learn how to install 👉 (Link)[https://book.getfoundry.sh/forge/tests?highlight=run%20test#tests]
 
-```shell
-$ forge fmt
+### Step 4
+
+Run the test by using this command:
+
+```bash
+    forge test --mt <TEST_NAME>
 ```
 
-### Gas Snapshots
+For example:
 
-```shell
-$ forge snapshot
+```bash
+    forge test --mt test_checking
 ```
 
-### Anvil
-
-```shell
-$ anvil
-```
-
-### Deploy
-
-```shell
-$ forge script script/Counter.s.sol:CounterScript --rpc-url <your_rpc_url> --private-key <your_private_key>
-```
-
-### Cast
-
-```shell
-$ cast <subcommand>
-```
-
-### Help
-
-```shell
-$ forge --help
-$ anvil --help
-$ cast --help
-```
+To learn more about Testing please visit this link 👉 (Link)[https://book.getfoundry.sh/forge/tests?highlight=run%20test#tests]
