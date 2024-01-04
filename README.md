@@ -2,7 +2,7 @@
 
 ### Step 1
 
-Install foundry by following the steps mentioned here 👉 [foundry.bool](https://book.getfoundry.sh/getting-started/installation)
+Install foundry by following the steps mentioned here 👉 [foundry book](https://book.getfoundry.sh/getting-started/installation)
 
 ### Step 2
 
