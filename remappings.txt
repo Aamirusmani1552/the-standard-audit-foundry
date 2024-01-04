@@ -1,0 +1,5 @@
+@forge-std/=lib/forge-std/
+@openzeppelin-contracts-upgradeable/=lib/openzeppelin-contracts-upgradeable/contracts/
+@openzeppelin/=lib/openzeppelin-contracts/
+@chainlink/contracts/=lib/chainlink/contracts/
+@weird-erc20/=lib/weird-erc20/
