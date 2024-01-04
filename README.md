@@ -20,7 +20,7 @@ Install the dependencies by using following command:
     forge install
 ```
 
-If the command is not working means something has been changed in foundry, please go to this link to learn how to install 👉 (Link)[https://book.getfoundry.sh/forge/tests?highlight=run%20test#tests]
+If the command is not working means something has been changed in foundry, please go to this link to learn how to install 👉 [Link](https://book.getfoundry.sh/forge/tests?highlight=run%20test#tests)
 
 ### Step 4
 
@@ -36,4 +36,4 @@ For example:
     forge test --mt test_checking
 ```
 
-To learn more about Testing please visit this link 👉 (Link)[https://book.getfoundry.sh/forge/tests?highlight=run%20test#tests]
+To learn more about Testing please visit this link 👉 [Link](https://book.getfoundry.sh/forge/tests?highlight=run%20test#tests)
