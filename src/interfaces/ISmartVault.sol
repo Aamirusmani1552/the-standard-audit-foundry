@@ -9,6 +9,7 @@ interface ISmartVault {
         uint256 amount;
         uint256 collateralValue;
     }
+
     struct Status {
         address vaultAddress;
         uint256 minted;

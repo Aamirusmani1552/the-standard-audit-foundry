@@ -1,0 +1,3 @@
+Fuzz:testFuzz_increasePosition(uint256) (runs: 256, μ: 458572, ~: 459696)
+Unit:test_AddMultiplePendingStakes() (gas: 15782131560)
+Unit:test_decreaseStakeCanCauseLossOfFeeReward() (gas: 4045781)

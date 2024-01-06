@@ -18,10 +18,7 @@ contract Fuzz is Common {
         tokens.tstToken.mint(alice, amount);
 
         // for now give some tokens to liquidation pool manager
-        tokens.eurosToken.mint(
-            address(contracts.liquidationPoolManager),
-            amount
-        );
+        tokens.eurosToken.mint(address(contracts.liquidationPoolManager), amount);
 
         // alice increases position
         vm.startPrank(alice);
@@ -31,10 +28,8 @@ contract Fuzz is Common {
         vm.stopPrank();
 
         // getting position and rewards for alice
-        (
-            LiquidationPool.Position memory _position,
-            LiquidationPool.Reward[] memory _reward
-        ) = contracts.liquidationPool.position(alice);
+        (LiquidationPool.Position memory _position, LiquidationPool.Reward[] memory _reward) =
+            contracts.liquidationPool.position(alice);
 
         assertEq(_position.TST, amount);
         assertEq(_position.EUROs, amount);
