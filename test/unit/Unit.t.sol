@@ -96,12 +96,15 @@ contract Unit is Common {
 
         assertEq(mikePaxgAmount, mikePaxgBalanceInVault, "Balance is not equal");
 
-        /////////////////////////////////////////////////////////////////////////////////////////////
-        ///     Mike decides to mint some euros from the vault that generates some fees           ///
-        ///     feeGenerated = (eurosMikeWant * constants.PROTOCOL_FEE_RATE) / 100000             ///
-        ///     feeGenerated =  500 ether * 500 / 100000                                          ///
-        ///     feeGenerated =  2.5 ether                                                         ///
-        /////////////////////////////////////////////////////////////////////////////////////////////
+        /////////////////////////////////////////////////////////////////////////////////////////////////////
+        ///     Mike decides to mint some euros from the vault that generates some fees                   ///
+        ///     feeGeneratedFromMint = (eurosMikeWant * constants.PROTOCOL_FEE_RATE) / 100000             ///
+        ///     feeGenereatedFromMint = 500000000000000000000 * 500 / 100000                              ///
+        ///     feeGeneratedFromMint =  2.5 ether (i.e 2.5 tokens)                                        ///
+        ///     feeShareForPool = feeGeneratedFromMint * constants.POOL_FEE_PERCENTAGE) / 100000          ///
+        ///     feeShareForPool =  2.5 ether * 50000 / 100000                                             ///
+        ///     feeShareForPool =  1.25 ether  or 1250000000000000000                                     ///
+        /////////////////////////////////////////////////////////////////////////////////////////////////////
 
         vm.startPrank(mike);
         uint256 eurosMikeWant = mikePaxgBalanceInVault / 2;
@@ -128,10 +131,15 @@ contract Unit is Common {
         ///    Bob add more tokens to his positions. This time there is a fee                           ///
         ///    in the liquidationPoolManager that will be added to his stakes                           ///
         ///    Proporational to his stakes                                                              ///
-        ///    Bob's fee share = feeGenerated * (balance before the stake) / (Total TST balance)        ///
-        ///    Bob's fee share = 2.5 tokens * 1000 tokens / 4000 tokens (2000 bobs and 2000 alice's)    ///
-        ///    Bob's fee share = 0.625 euros                                                            ///
+        ///    Bob's fee share = feeShareForPool * (balance before the stake) / (Total TST balance)     ///
+        ///    Bob's fee share = 1.25 ether * 1000 tokens / 2000 tokens (1000 bobs and 1000 alice's)    ///
+        ///    Bob's fee share = 1250000000000000000 * 1000 / 2000 tokens                               ///
+        ///    Bob's fee share = 0.625 euros   or  625000000000000000                                   ///
         ///////////////////////////////////////////////////////////////////////////////////////////////////
+
+        (bobPosition,) = contracts.liquidationPool.position(bob);
+
+        uint256 bobsFeeShare = ((eurosFeeInLiquidationManager * constants.POOL_FEE_PERCENTAGE / 100000 ) * bobPosition.TST) / tokens.tstToken.balanceOf(address(contracts.liquidationPool));
 
         vm.startPrank(bob);
         tokens.eurosToken.approve(address(contracts.liquidationPool), amount);
@@ -144,9 +152,6 @@ contract Unit is Common {
         ////////////////////////////////////////////////////////////////////////////////////////////
 
         (bobPosition,) = contracts.liquidationPool.position(bob);
-
-        uint256 bobsFeeShare = (eurosFeeInLiquidationManager * (amount)) / tokens.tstToken.totalSupply();
-
         assertEq(bobPosition.EUROs, amount * 2 + bobsFeeShare, "Bob's euros amount are not eqaul");
         assertEq(bobsFeeShare, 0.625 ether, "Bob's fee share is not equal");
         assertEq(bobPosition.TST, amount * 2, "Bob's TSTs amount are not eqaul");
@@ -183,7 +188,8 @@ contract Unit is Common {
         //////////////////////////////////////////////////////////////////////////////////////
         ///     Mike decides to mint some more tokens against his vault balances.          ///
         ///     More fee will be generated and added to the liquidationPoolManager         ///
-        ///     feeGenerated = 2.5 tokens          (i.e because same amount is deposited)  ///
+        ///     feeGenereatedFromMint = 2.5 tokens (i.e because same amount is minted)     ///
+        ///     feeShareForPool =  1.25 ether  or 1250000000000000000                      ///
         //////////////////////////////////////////////////////////////////////////////////////
 
         tokens.paxgToken.mint(mike, amount);
@@ -206,6 +212,8 @@ contract Unit is Common {
 
         ////////////////////////////////////////////////////
         ///     Checking if correct fee is generated     ///
+        ///     Fee generated will be same as before     ///
+        ///     as the amount minted is same             ///
         ////////////////////////////////////////////////////
 
         eurosFeeInLiquidationManager = tokens.eurosToken.balanceOf(address(contracts.liquidationPoolManager));
@@ -213,11 +221,31 @@ contract Unit is Common {
         assertEq(eurosFeeInLiquidationManager, feeGenerated, "Balance is empty");
         assertEq(eurosFeeInLiquidationManager, 2.5 ether, "Balance is empty");
 
+        
+        ///////////////////////////////////////////////////////////////////////////////
+        ///     Getting bob's position to check if his amount shows the rewards     ///
+        ///////////////////////////////////////////////////////////////////////////////
+
+        (bobPosition,) = contracts.liquidationPool.position(bob);
+
+        bobsFeeShare = ((eurosFeeInLiquidationManager * constants.POOL_FEE_PERCENTAGE / 100000 ) * bobPosition.TST) / (tokens.tstToken.balanceOf(address(contracts.liquidationPool)));
+
+        // NOTE: here the bobPosition.EUROs shows the wrong amount since there is a bug in position function. It is calculating fee
+        // of staker based on the total balance of manager while pool is going to receive only percentage of the fee generated. Rest
+        // will go to protocol address. In this case pool fee percentage is 50% so the amount shown by bobPosition.EUROs will be
+        // twice the amount he will receive.
+
+        assertEq(bobPosition.EUROs, amount + (0.625 ether * 2), "Bob's euros amount are not eqaul");
+        assertEq(bobPosition.EUROs, amount + (bobsFeeShare * 2), "Bob's euros amount are not eqaul");
+        assertEq(bobPosition.TST, amount, "Bob's euros amount are not eqaul");
+
         /////////////////////////////////////////////////////
         ///     Skipping some time to consolidate stakes  ///
         /////////////////////////////////////////////////////
 
+
         skip(block.timestamp + 1 weeks);
+
 
         ///////////////////////////////////////////////////////////////////////////////////////////
         ///     Since enough time has passed bob decides to withdraw rest of his amount.        ///
@@ -240,11 +268,17 @@ contract Unit is Common {
 
         ///////////////////////////////////////////////////////////////////////////////////////////////////
         ///     But fee is not received since bob's address has been withdrawn from the holders array   ///
-        ///     So his position should be 0 TST and 0 euros                                             ///
+        ///     So his position should be 0 TST and 0 euros and all of the fee should have been         ///
+        ///     transferred to alice                                                                    ///
+        ///     (i.e 0.625 euros of first fee rewards and 1.25 euros of second fee reward)             ///
         ///////////////////////////////////////////////////////////////////////////////////////////////////
 
         assertEq(bobPosition.EUROs, 0, "Bob's euros amount is not zero");
         assertEq(bobPosition.TST, 0);
+
+        (alicePosition,) = contracts.liquidationPool.position(alice);
+        assertEq(alicePosition.EUROs, amount + (bobsFeeShare * 3), "Alice's euros amount are not eqaul");
+
     }
 
     // @audit test passed

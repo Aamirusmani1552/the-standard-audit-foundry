@@ -60,13 +60,15 @@ contract LiquidationPool is ILiquidationPool {
 
     // @audit don't forget to add the openzeppelin contract version dependency issue in the report
     // lesser from the two will be returned so that the stake of lesser one is incentivized
-    // @audit but what if the there is a balance in TST but not in EUROs? Would a staker get the rewards?
+    // @audit-info but what if the there is a balance in TST but not in EUROs? Would a staker get the rewards: there should be amount
+    // in both EUROs and TST to get the rewards
     function stake(Position memory _position) private pure returns (uint256) {
         return _position.TST > _position.EUROs ? _position.EUROs : _position.TST;
     }
 
     // returns the total stakes of the holders. It will only count for the position of the holder in the lesser of the two asset deposited
-    // @audit but in _stakes, both euro's and tst's will be added and both represent different assets. what is the purpose of this?
+    // @audit-info but in _stakes, both euro's and tst's will be added and both represent different assets. what is the purpose of this?
+    // Both TST and EUROs will have same value in the _stakes
     function getStakeTotal() private view returns (uint256 _stakes) {
         for (uint256 i = 0; i < holders.length; i++) {
             Position memory _position = positions[holders[i]];
@@ -117,6 +119,7 @@ contract LiquidationPool is ILiquidationPool {
         _position.TST += _pendingTST;
 
         // @audit if the position holds TST, why some percentage of manager's EURO balance is added to the position?
+        // @audit position shows the incorrect balance of the staker. the pool receive percentage of the total balance not whole balance
         if (_position.TST > 0) {
             _position.EUROs += (IERC20(EUROs).balanceOf(manager) * _position.TST) / getTstTotal();
         }
@@ -273,6 +276,7 @@ contract LiquidationPool is ILiquidationPool {
 
     // manager is going to call this function to distribute the fees
     function distributeFees(uint256 _amount) external onlyManager {
+
         uint256 tstTotal = getTstTotal();
         if (tstTotal > 0) {
             // fees will be transferred from the manager to this contract
