@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity 0.8.17;
 
-import "@openzeppelin-contracts-upgradeable/access/OwnableUpgradeable.sol";
-import "@openzeppelin-contracts-upgradeable/proxy/utils/Initializable.sol";
-import "@openzeppelin-contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol";
-import "@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol";
-import "src/interfaces/INFTMetadataGenerator.sol";
-import "src/interfaces/IEUROs.sol";
-import "src/interfaces/ISmartVault.sol";
-import "src/interfaces/ISmartVaultDeployer.sol";
-import "src/interfaces/ISmartVaultIndex.sol";
-import "src/interfaces/ISmartVaultManager.sol";
-import "src/interfaces/ISmartVaultManagerV2.sol";
+import '@openzeppelin-contracts-upgradeable/access/OwnableUpgradeable.sol';
+import '@openzeppelin-contracts-upgradeable/proxy/utils/Initializable.sol';
+import '@openzeppelin-contracts-upgradeable/token/ERC721/ERC721Upgradeable.sol';
+import '@openzeppelin/contracts/token/ERC20/utils/SafeERC20.sol';
+import 'src/interfaces/INFTMetadataGenerator.sol';
+import 'src/interfaces/IEUROs.sol';
+import 'src/interfaces/ISmartVault.sol';
+import 'src/interfaces/ISmartVaultDeployer.sol';
+import 'src/interfaces/ISmartVaultIndex.sol';
+import 'src/interfaces/ISmartVaultManager.sol';
+import 'src/interfaces/ISmartVaultManagerV2.sol';
 
 // @audit ownable contract not initialized as well as erc721
 // @audit upgradeable version of initializable should be used
@@ -24,49 +24,49 @@ contract SmartVaultManagerV5 is
 {
     using SafeERC20 for IERC20;
 
-    uint256 public constant HUNDRED_PC = 1e5;
+    uint public constant HUNDRED_PC = 1e5;
 
     address public protocol;
     address public liquidator;
     address public euros;
-    uint256 public collateralRate;
+    uint public collateralRate;
     address public tokenManager;
     address public smartVaultDeployer;
     ISmartVaultIndex private smartVaultIndex;
-    uint256 private lastToken;
+    uint private lastToken;
     address public nftMetadataGenerator;
-    uint256 public mintFeeRate;
-    uint256 public burnFeeRate;
+    uint public mintFeeRate;
+    uint public burnFeeRate;
     // newly added data
-    uint256 public swapFeeRate;
+    uint public swapFeeRate;
     address public weth;
     address public swapRouter;
     address public swapRouter2;
 
-    event VaultDeployed(address indexed vaultAddress, address indexed owner, address vaultType, uint256 tokenId);
+    event VaultDeployed(address indexed vaultAddress, address indexed owner, address vaultType, uint tokenId);
     event VaultLiquidated(address indexed vaultAddress);
-    event VaultTransferred(uint256 indexed tokenId, address from, address to);
+    event VaultTransferred(uint indexed tokenId, address from, address to);
 
     struct SmartVaultData {
-        uint256 tokenId;
-        uint256 collateralRate;
-        uint256 mintFeeRate;
-        uint256 burnFeeRate;
+        uint tokenId;
+        uint collateralRate;
+        uint mintFeeRate;
+        uint burnFeeRate;
         ISmartVault.Status status;
     }
 
-    function initialize() public initializer {}
+    function initialize() public initializer { }
 
     modifier onlyLiquidator() {
-        require(msg.sender == liquidator, "err-invalid-liquidator");
+        require(msg.sender == liquidator, 'err-invalid-liquidator');
         _;
     }
 
     // returns the vaults owned by the msg.sender
     function vaults() external view returns (SmartVaultData[] memory) {
         // get the tokenIds owned by the msg.sender
-        uint256[] memory tokenIds = smartVaultIndex.getTokenIds(msg.sender);
-        uint256 idsLength = tokenIds.length;
+        uint[] memory tokenIds = smartVaultIndex.getTokenIds(msg.sender);
+        uint idsLength = tokenIds.length;
         // create an array of SmartVaultData structs
         // struct Status {
         //     address vaultAddress;
@@ -81,8 +81,8 @@ contract SmartVaultManagerV5 is
         SmartVaultData[] memory vaultData = new SmartVaultData[](idsLength);
 
         // for each tokenId owned by the msg.sender, get the vault address and status
-        for (uint256 i = 0; i < idsLength; i++) {
-            uint256 tokenId = tokenIds[i];
+        for (uint i = 0; i < idsLength; i++) {
+            uint tokenId = tokenIds[i];
             vaultData[i] = SmartVaultData({
                 tokenId: tokenId,
                 collateralRate: collateralRate,
@@ -96,7 +96,9 @@ contract SmartVaultManagerV5 is
 
     // @audit is it allowed to mint more than one vault for a particular msg.sender
     // mint new vault token to the msg.sender
-    function mint() external returns (address vault, uint256 tokenId) {
+    // @audit the smart vault is an NFT, so that mean it is transferrable. But does the rewards and other amounts
+    // are transferred as well?
+    function mint() external returns (address vault, uint tokenId) {
         // increment the tokenId and mint the new vault
         // @audit 0 token id will not be minted. will that cause any issues?
         tokenId = lastToken + 1;
@@ -123,7 +125,7 @@ contract SmartVaultManagerV5 is
     // can be called by the liquidator only
     // @audit who is going to be the liquidator?
     // @audit who is going to be benefitted from the liquidation? would that be protocol or the stakers?
-    function liquidateVault(uint256 _tokenId) external onlyLiquidator {
+    function liquidateVault(uint _tokenId) external onlyLiquidator {
         // get the vault address from the smart vault index
         ISmartVault vault = ISmartVault(smartVaultIndex.getVaultAddress(_tokenId));
 
@@ -132,7 +134,7 @@ contract SmartVaultManagerV5 is
         // try calling undercollateralised() on the vault to get the status
         try vault.undercollateralised() returns (bool _undercollateralised) {
             // if the vault is undercollateralised, liquidate it
-            require(_undercollateralised, "vault-not-undercollateralised");
+            require(_undercollateralised, 'vault-not-undercollateralised');
             vault.liquidate();
 
             // revoke the minter and burner roles from the vault in euros token
@@ -141,12 +143,12 @@ contract SmartVaultManagerV5 is
             emit VaultLiquidated(address(vault));
         } catch {
             // if undercollateralised() reverts, revert with the error message
-            revert("other-liquidation-error");
+            revert('other-liquidation-error');
         }
     }
 
     // get the tokenURI for the given tokenId
-    function tokenURI(uint256 _tokenId) public view virtual override returns (string memory) {
+    function tokenURI(uint _tokenId) public view virtual override returns (string memory) {
         // get the vault status from the smart vault index
         ISmartVault.Status memory vaultStatus = ISmartVault(smartVaultIndex.getVaultAddress(_tokenId)).status();
 
@@ -155,22 +157,22 @@ contract SmartVaultManagerV5 is
     }
 
     // get the totalSupply of the smart vault manager NFT
-    function totalSupply() external view returns (uint256) {
+    function totalSupply() external view returns (uint) {
         return lastToken;
     }
 
     // set the MintFeeRate
-    function setMintFeeRate(uint256 _rate) external onlyOwner {
+    function setMintFeeRate(uint _rate) external onlyOwner {
         mintFeeRate = _rate;
     }
 
     // set the BurnFeeRate
-    function setBurnFeeRate(uint256 _rate) external onlyOwner {
+    function setBurnFeeRate(uint _rate) external onlyOwner {
         burnFeeRate = _rate;
     }
 
     // set the SWapFeeRate
-    function setSwapFeeRate(uint256 _rate) external onlyOwner {
+    function setSwapFeeRate(uint _rate) external onlyOwner {
         swapFeeRate = _rate;
     }
 
@@ -208,7 +210,7 @@ contract SmartVaultManagerV5 is
     // when the smart vault token is transferred from the from address to to address
     // transfer the tokenId from the smart vault index
     // transfer the ownership of the vault from the from address to the to address
-    function _afterTokenTransfer(address _from, address _to, uint256 _tokenId, uint256) internal override {
+    function _afterTokenTransfer(address _from, address _to, uint _tokenId, uint) internal override {
         smartVaultIndex.transferTokenId(_from, _to, _tokenId);
         if (address(_from) != address(0)) {
             ISmartVault(smartVaultIndex.getVaultAddress(_tokenId)).setOwner(_to);

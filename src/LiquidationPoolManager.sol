@@ -1,17 +1,17 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.17;
 
-import "@openzeppelin/contracts/token/ERC20/IERC20.sol";
-import "@openzeppelin/contracts/access/Ownable.sol";
-import "src/LiquidationPool.sol";
-import "src/interfaces/ILiquidationPoolManager.sol";
-import "src/interfaces/ISmartVaultManager.sol";
-import "src/interfaces/ITokenManager.sol";
-import {console2} from "forge-std/console2.sol";
+import '@openzeppelin/contracts/token/ERC20/IERC20.sol';
+import '@openzeppelin/contracts/access/Ownable.sol';
+import 'src/LiquidationPool.sol';
+import 'src/interfaces/ILiquidationPoolManager.sol';
+import 'src/interfaces/ISmartVaultManager.sol';
+import 'src/interfaces/ITokenManager.sol';
+import { console2 } from 'forge-std/console2.sol';
 
 // @audit what if the smartVaultManager is updated, how will that be updated in the pool manager?
 contract LiquidationPoolManager is Ownable {
-    uint32 public constant HUNDRED_PC = 100000;
+    uint32 public constant HUNDRED_PC = 100_000;
 
     address private immutable TST;
     address private immutable EUROs;
@@ -38,12 +38,12 @@ contract LiquidationPoolManager is Ownable {
         poolFeePercentage = _poolFeePercentage;
     }
 
-    receive() external payable {}
+    receive() external payable { }
 
     // @audit where will this euro come from in the first place
     function distributeFees() public {
         IERC20 eurosToken = IERC20(EUROs);
-        uint256 _feesForPool = (eurosToken.balanceOf(address(this)) * poolFeePercentage) / HUNDRED_PC;
+        uint _feesForPool = (eurosToken.balanceOf(address(this)) * poolFeePercentage) / HUNDRED_PC;
         if (_feesForPool > 0) {
             // @audit return values not checked
             eurosToken.approve(pool, _feesForPool);
@@ -54,16 +54,16 @@ contract LiquidationPoolManager is Ownable {
     }
 
     function forwardRemainingRewards(ITokenManager.Token[] memory _tokens) private {
-        for (uint256 i = 0; i < _tokens.length; i++) {
+        for (uint i = 0; i < _tokens.length; i++) {
             ITokenManager.Token memory _token = _tokens[i];
             if (_token.addr == address(0)) {
-                uint256 balance = address(this).balance;
+                uint balance = address(this).balance;
                 if (balance > 0) {
-                    (bool _sent,) = protocol.call{value: balance}("");
+                    (bool _sent,) = protocol.call{ value: balance }('');
                     require(_sent);
                 }
             } else {
-                uint256 balance = IERC20(_token.addr).balanceOf(address(this));
+                uint balance = IERC20(_token.addr).balanceOf(address(this));
                 // @audit return values of transfer function is not used
                 if (balance > 0) {
                     IERC20(_token.addr).transfer(protocol, balance);
@@ -72,7 +72,7 @@ contract LiquidationPoolManager is Ownable {
         }
     }
 
-    function runLiquidation(uint256 _tokenId) external {
+    function runLiquidation(uint _tokenId) external {
         // get the manager
         ISmartVaultManager manager = ISmartVaultManager(smartVaultManager);
 
@@ -89,11 +89,11 @@ contract LiquidationPoolManager is Ownable {
 
         // create asset array for the payment info
         ILiquidationPoolManager.Asset[] memory assets = new ILiquidationPoolManager.Asset[](tokens.length);
-        uint256 ethBalance;
+        uint ethBalance;
 
         // loop over each token to add the asset to the asset array and approve pool for transfer of the token
         // @audit what if there is only erc20 tokens in the pool
-        for (uint256 i = 0; i < tokens.length; i++) {
+        for (uint i = 0; i < tokens.length; i++) {
             ITokenManager.Token memory token = tokens[i];
 
             if (token.addr == address(0)) {
@@ -103,7 +103,7 @@ contract LiquidationPoolManager is Ownable {
                 }
             } else {
                 IERC20 ierc20 = IERC20(token.addr);
-                uint256 erc20balance = ierc20.balanceOf(address(this));
+                uint erc20balance = ierc20.balanceOf(address(this));
                 if (erc20balance > 0) {
                     assets[i] = ILiquidationPoolManager.Asset(token, erc20balance);
                     // @audit return values not checked for the approve
@@ -113,7 +113,7 @@ contract LiquidationPoolManager is Ownable {
         }
 
         // call distribute Assets in the pool
-        LiquidationPool(pool).distributeAssets{value: ethBalance}(
+        LiquidationPool(pool).distributeAssets{ value: ethBalance }(
             assets, manager.collateralRate(), manager.HUNDRED_PC()
         );
 

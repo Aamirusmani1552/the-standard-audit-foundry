@@ -2,25 +2,24 @@
 
 pragma solidity 0.8.17;
 
-import {Common} from "../Common.t.sol";
+import { Common } from '../Common.t.sol';
 
-contract Handler is Common{
-    uint256 initialUserAmountOfTokens = 1000 ether;
-    uint256 randomNonce = 0;
+contract Handler is Common {
+    uint initialUserAmountOfTokens = 1000 ether;
+    uint randomNonce = 0;
     bool initialized;
 
     function setUp() public override {
-        if(initialized) return;
+        if (initialized) return;
         super.setUp();
         vm.deal(address(this), 1000 ether);
         initialized = true;
     }
 
-
-    function increaseLiquidationPoolPosition(uint256 amountEuros, uint256 amountTSTs) public returns(uint256, uint256) {
+    function increaseLiquidationPoolPosition(uint amountEuros, uint amountTSTs) public returns (uint, uint) {
         address user = _createRandomUser();
 
-        amountEuros = bound(amountEuros, 1000, 1000_000 ether);
+        amountEuros = bound(amountEuros, 1000, 1_000_000 ether);
         amountTSTs = bound(amountTSTs, 1000, 1_000_000 ether);
 
         tokens.eurosToken.mint(address(user), amountEuros);
@@ -35,11 +34,12 @@ contract Handler is Common{
         contracts.liquidationPool.increasePosition(amountEuros, amountTSTs);
         vm.stopPrank();
 
-        return(amountEuros, amountTSTs);
+        return (amountEuros, amountTSTs);
     }
 
     function _createRandomUser() internal returns (address) {
-        address user = address(uint160(uint256(keccak256(abi.encodePacked(block.timestamp, block.difficulty, randomNonce++)))));
+        address user =
+            address(uint160(uint(keccak256(abi.encodePacked(block.timestamp, block.difficulty, randomNonce++)))));
         vm.deal(user, 1000 ether);
         return user;
     }
@@ -56,5 +56,4 @@ contract Handler is Common{
     function getPriceFeedsContracts() public view returns (PriceFeedsInstances memory) {
         return priceFeeds;
     }
-
 }

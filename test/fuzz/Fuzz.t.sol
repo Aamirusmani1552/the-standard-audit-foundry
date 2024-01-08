@@ -1,7 +1,7 @@
 // SPDX-License-Identifier: MIT
 pragma solidity 0.8.17;
 
-import {Common, console2, LiquidationPool} from "../Common.t.sol";
+import { Common, console2, LiquidationPool } from '../Common.t.sol';
 
 contract Fuzz is Common {
     function setUp() public override {
@@ -9,7 +9,7 @@ contract Fuzz is Common {
     }
 
     // tested for 100k runs with values between 0 and 10 billion
-    function testFuzz_increasePosition(uint256 amount) public {
+    function testFuzz_increaseAndDecreasePosition(uint amount) public {
         vm.assume(amount > 0 && amount < 10_000_000_000 ether);
         // mingting some euros to alice
         tokens.eurosToken.mint(alice, amount);
@@ -33,5 +33,25 @@ contract Fuzz is Common {
 
         assertEq(_position.TST, amount);
         assertEq(_position.EUROs, amount);
+
+        // skipping some time
+        skip(block.timestamp + 2 days);
+
+        // withdrawing the stake
+        vm.startPrank(alice);
+        contracts.liquidationPool.decreasePosition(amount, amount);
+        vm.stopPrank();
+
+        // getting the position and rewards for alice
+        // getting position and rewards for alice
+        (_position, _reward) = contracts.liquidationPool.position(alice);
+
+        // position should be empty
+        assertEq(_position.TST, 0);
+        assertEq(_position.EUROs, 0);
+
+        // alice should have correct balance
+        assertEq(tokens.eurosToken.balanceOf(alice), amount);
+        assertEq(tokens.tstToken.balanceOf(alice), amount);
     }
 }

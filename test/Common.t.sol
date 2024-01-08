@@ -1,33 +1,33 @@
 // SPDX-License-Identifier: UNLICENSED
 pragma solidity ^0.8.17;
 
-import {Test} from "forge-std/Test.sol";
-import {LiquidationPool} from "src/LiquidationPool.sol";
-import {SmartVaultManagerV5} from "src/SmartVaultManagerV5.sol";
-import {SmartVaultV3} from "src/SmartVaultV3.sol";
-import {LiquidationPoolManager} from "src/LiquidationPoolManager.sol";
-import {IERC20} from "@openzeppelin/contracts/token/ERC20/IERC20.sol";
+import { Test } from 'forge-std/Test.sol';
+import { LiquidationPool } from 'src/LiquidationPool.sol';
+import { SmartVaultManagerV5 } from 'src/SmartVaultManagerV5.sol';
+import { SmartVaultV3 } from 'src/SmartVaultV3.sol';
+import { LiquidationPoolManager } from 'src/LiquidationPoolManager.sol';
+import { IERC20 } from '@openzeppelin/contracts/token/ERC20/IERC20.sol';
 import {
     TransparentUpgradeableProxy,
     ITransparentUpgradeableProxy
-} from "@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol";
-import {ProxyAdmin} from "@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol";
-import {WETHMock} from "utils/WETHMock.sol";
-import {SmartVaultManager} from "utils/SmartVaultManager.sol";
-import {ERC20Mock} from "utils/ERC20Mock.sol";
-import {ChainlinkMock} from "utils/ChainlinkMock.sol";
-import {EUROsMock} from "utils/EUROsMock.sol";
-import {SwapRouterMock} from "utils/SwapRouterMock.sol";
-import {TokenManagerMock} from "utils/TokenManagerMock.sol";
-import {SmartVaultIndex} from "utils/SmartVaultIndex.sol";
-import {PriceCalculator} from "utils/PriceCalculator.sol";
+} from '@openzeppelin/contracts/proxy/transparent/TransparentUpgradeableProxy.sol';
+import { ProxyAdmin } from '@openzeppelin/contracts/proxy/transparent/ProxyAdmin.sol';
+import { WETHMock } from 'utils/WETHMock.sol';
+import { SmartVaultManager } from 'utils/SmartVaultManager.sol';
+import { ERC20Mock } from 'utils/ERC20Mock.sol';
+import { ChainlinkMock } from 'utils/ChainlinkMock.sol';
+import { EUROsMock } from 'utils/EUROsMock.sol';
+import { SwapRouterMock } from 'utils/SwapRouterMock.sol';
+import { TokenManagerMock } from 'utils/TokenManagerMock.sol';
+import { SmartVaultIndex } from 'utils/SmartVaultIndex.sol';
+import { PriceCalculator } from 'utils/PriceCalculator.sol';
 // import {NFTMetadataGenerator} from "utils/nfts/NFTMetadataGenerator.sol";
-import {SmartVaultDeployerV3} from "utils/SmartVaultDeployerV3.sol";
-import {console2} from "forge-std/console2.sol";
+import { SmartVaultDeployerV3 } from 'utils/SmartVaultDeployerV3.sol';
+import { console2 } from 'forge-std/console2.sol';
 
 contract NFTMetadataGenerator {
     function generateNFTMetadata() external pure returns (string memory) {
-        return "test";
+        return 'test';
     }
 }
 
@@ -83,46 +83,46 @@ contract Common is Test {
     // constants
     struct Constants {
         uint32 POOL_FEE_PERCENTAGE; // 50%
-        int256 DEFAULT_COLLATERAL_RATE; // 120%
-        int256 DEFAULT_ETH_USD_PRICE; // $2327.00000000
-        int256 DEFAULT_EUR_USD_PRICE; // $1.10430000
-        int256 DEFAULT_WBTC_USD_PRICE; // $43164.60115497
-        int256 DEFAULT_USDC_USD_PRICE; // $1.00013800
-        int256 DEFAULT_LINK_USD_PRICE; // $15.37949402
-        int256 DEFAULT_PAXG_USD_PRICE; // $2030.46588596
-        int256 DEFAULT_ARB_USD_PRICE; // $1.71177087
-        uint256 PROTOCOL_FEE_RATE; // 0.5%
+        int DEFAULT_COLLATERAL_RATE; // 120%
+        int DEFAULT_ETH_USD_PRICE; // $2327.00000000
+        int DEFAULT_EUR_USD_PRICE; // $1.10430000
+        int DEFAULT_WBTC_USD_PRICE; // $43164.60115497
+        int DEFAULT_USDC_USD_PRICE; // $1.00013800
+        int DEFAULT_LINK_USD_PRICE; // $15.37949402
+        int DEFAULT_PAXG_USD_PRICE; // $2030.46588596
+        int DEFAULT_ARB_USD_PRICE; // $1.71177087
+        uint PROTOCOL_FEE_RATE; // 0.5%
     }
 
     Constants public constants = Constants(
-        50000, // POOL_FEE_PERCENTAGE
-        120000, // DEFAULT_COLLATERAL_RATE
-        232700000000, // DEFAULT_ETH_USD_PRICE
-        110430000, // DEFAULT_EUR_USD_PRICE
-        4316400000000, // DEFAULT_WBTC_USD_PRICE
-        100013800, // DEFAULT_USDC_USD_PRICE
-        1500000000, // DEFAULT_LINK_USD_PRICE
-        203000000000, // DEFAULT_PAXG_USD_PRICE
-        170000000, // DEFAULT_ARB_USD_PRICE
+        50_000, // POOL_FEE_PERCENTAGE
+        120_000, // DEFAULT_COLLATERAL_RATE
+        232_700_000_000, // DEFAULT_ETH_USD_PRICE
+        110_430_000, // DEFAULT_EUR_USD_PRICE
+        4_316_400_000_000, // DEFAULT_WBTC_USD_PRICE
+        100_013_800, // DEFAULT_USDC_USD_PRICE
+        1_500_000_000, // DEFAULT_LINK_USD_PRICE
+        203_000_000_000, // DEFAULT_PAXG_USD_PRICE
+        170_000_000, // DEFAULT_ARB_USD_PRICE
         500 // PROTOCOL_FEE_RATE
     );
 
     // users
-    address public alice = makeAddr("alice");
-    address public bob = makeAddr("bob");
+    address public alice = makeAddr('alice');
+    address public bob = makeAddr('bob');
 
     function setUp() public virtual {
         //////////////////////////////////
         ///         Protocol           ///
         //////////////////////////////////
 
-        protocol = makeAddr("protocol");
+        protocol = makeAddr('protocol');
 
         ///////////////////////////////////
         ///         Liquidator          ///
         ///////////////////////////////////
 
-        liquidator = makeAddr("liquidator");
+        liquidator = makeAddr('liquidator');
 
         ///////////////////////////////////////////////////////////////////
         ///     Moving some time to make block.timestamp bigger        ////
@@ -166,7 +166,7 @@ contract Common is Test {
 
         contracts.smartVaultManager = new SmartVaultManager();
 
-        contracts.smartVaultDeployer = new SmartVaultDeployerV3(bytes32("ETH"), address(priceFeeds.eurosUsdPriceFeed));
+        contracts.smartVaultDeployer = new SmartVaultDeployerV3(bytes32('ETH'), address(priceFeeds.eurosUsdPriceFeed));
 
         // initialize data for smartVaultManager
         bytes memory data = abi.encodeWithSelector(
@@ -228,34 +228,34 @@ contract Common is Test {
     }
 
     function _createLabels() internal {
-        vm.label(address(contracts.liquidationPool), "LiquidationPool");
-        vm.label(address(contracts.smartVaultManager), "SmartVaultManager");
-        vm.label(address(contracts.smartVaultManagerV5), "SmartVaultManagerV5");
-        vm.label(address(contracts.smartVault), "SmartVault");
-        vm.label(address(contracts.liquidationPoolManager), "LiquidationPoolManager");
-        vm.label(address(contracts.tokenManager), "TokenManager");
-        vm.label(address(contracts.nftMetadataGenerator), "NFTMetadataGenerator");
-        vm.label(address(contracts.smartVaultDeployer), "SmartVaultDeployer");
-        vm.label(address(contracts.smartVaultIndex), "SmartVaultIndex");
-        vm.label(address(tokens.tstToken), "TST");
-        vm.label(address(tokens.eurosToken), "EUROs");
-        vm.label(address(tokens.wethToken), "WETH");
-        vm.label(address(tokens.wbtcToken), "WBTC");
-        vm.label(address(tokens.paxgToken), "PAXG");
-        vm.label(address(tokens.linkToken), "LINK");
-        vm.label(address(tokens.arbToken), "ARB");
-        vm.label(address(priceFeeds.eurosUsdPriceFeed), "EUROsUSDPriceFeed");
-        vm.label(address(priceFeeds.ethUsdPriceFeed), "ETHUSDPriceFeed");
-        vm.label(address(priceFeeds.arbUsdPriceFeed), "ARBUSDPriceFeed");
-        vm.label(address(priceFeeds.paxgUsdPriceFeed), "PAXGUSDPriceFeed");
-        vm.label(address(priceFeeds.wbtcUsdPriceFeed), "WBTCUSDPriceFeed");
-        vm.label(address(priceFeeds.linkUsdPriceFeed), "LINKUSDPriceFeed");
-        vm.label(address(priceFeeds.tstUsdPriceFeed), "TSTUSDPriceFeed");
-        vm.label(address(swapRouter2), "SwapRouter2");
-        vm.label(liquidator, "Liquidator");
-        vm.label(protocol, "Protocol");
-        vm.label(address(proxyAdmin), "ProxyAdmin");
-        vm.label(address(proxy), "Proxy");
+        vm.label(address(contracts.liquidationPool), 'LiquidationPool');
+        vm.label(address(contracts.smartVaultManager), 'SmartVaultManager');
+        vm.label(address(contracts.smartVaultManagerV5), 'SmartVaultManagerV5');
+        vm.label(address(contracts.smartVault), 'SmartVault');
+        vm.label(address(contracts.liquidationPoolManager), 'LiquidationPoolManager');
+        vm.label(address(contracts.tokenManager), 'TokenManager');
+        vm.label(address(contracts.nftMetadataGenerator), 'NFTMetadataGenerator');
+        vm.label(address(contracts.smartVaultDeployer), 'SmartVaultDeployer');
+        vm.label(address(contracts.smartVaultIndex), 'SmartVaultIndex');
+        vm.label(address(tokens.tstToken), 'TST');
+        vm.label(address(tokens.eurosToken), 'EUROs');
+        vm.label(address(tokens.wethToken), 'WETH');
+        vm.label(address(tokens.wbtcToken), 'WBTC');
+        vm.label(address(tokens.paxgToken), 'PAXG');
+        vm.label(address(tokens.linkToken), 'LINK');
+        vm.label(address(tokens.arbToken), 'ARB');
+        vm.label(address(priceFeeds.eurosUsdPriceFeed), 'EUROsUSDPriceFeed');
+        vm.label(address(priceFeeds.ethUsdPriceFeed), 'ETHUSDPriceFeed');
+        vm.label(address(priceFeeds.arbUsdPriceFeed), 'ARBUSDPriceFeed');
+        vm.label(address(priceFeeds.paxgUsdPriceFeed), 'PAXGUSDPriceFeed');
+        vm.label(address(priceFeeds.wbtcUsdPriceFeed), 'WBTCUSDPriceFeed');
+        vm.label(address(priceFeeds.linkUsdPriceFeed), 'LINKUSDPriceFeed');
+        vm.label(address(priceFeeds.tstUsdPriceFeed), 'TSTUSDPriceFeed');
+        vm.label(address(swapRouter2), 'SwapRouter2');
+        vm.label(liquidator, 'Liquidator');
+        vm.label(protocol, 'Protocol');
+        vm.label(address(proxyAdmin), 'ProxyAdmin');
+        vm.label(address(proxy), 'Proxy');
     }
 
     function _addAcceptedTokensWithFeeds() internal {
@@ -267,23 +267,23 @@ contract Common is Test {
     }
 
     function _deploytokens() internal {
-        tokens.tstToken = new ERC20Mock("The Standard Token", "TST", 18);
-        tokens.wbtcToken = new ERC20Mock("Wrapped Bitcoin", "WBTC", 8);
-        tokens.linkToken = new ERC20Mock("ChainLink token", "LINK", 18);
-        tokens.arbToken = new ERC20Mock("Arbitrum Token", "ARB", 18);
-        tokens.paxgToken = new ERC20Mock("Paxos Gold Token", "PAXG", 18);
+        tokens.tstToken = new ERC20Mock('The Standard Token', 'TST', 18);
+        tokens.wbtcToken = new ERC20Mock('Wrapped Bitcoin', 'WBTC', 8);
+        tokens.linkToken = new ERC20Mock('ChainLink token', 'LINK', 18);
+        tokens.arbToken = new ERC20Mock('Arbitrum Token', 'ARB', 18);
+        tokens.paxgToken = new ERC20Mock('Paxos Gold Token', 'PAXG', 18);
         tokens.eurosToken = new EUROsMock();
         tokens.wethToken = new WETHMock();
     }
 
     function _deployPriceFeeds() internal {
-        priceFeeds.eurosUsdPriceFeed = new ChainlinkMock("EUR / USD");
-        priceFeeds.ethUsdPriceFeed = new ChainlinkMock("ETH / USD");
-        priceFeeds.paxgUsdPriceFeed = new ChainlinkMock("PAXG / USD");
-        priceFeeds.linkUsdPriceFeed = new ChainlinkMock("LINK / USD");
-        priceFeeds.arbUsdPriceFeed = new ChainlinkMock("ARB / USD");
-        priceFeeds.wbtcUsdPriceFeed = new ChainlinkMock("WBTC / USD");
-        priceFeeds.tstUsdPriceFeed = new ChainlinkMock("TST / USD");
+        priceFeeds.eurosUsdPriceFeed = new ChainlinkMock('EUR / USD');
+        priceFeeds.ethUsdPriceFeed = new ChainlinkMock('ETH / USD');
+        priceFeeds.paxgUsdPriceFeed = new ChainlinkMock('PAXG / USD');
+        priceFeeds.linkUsdPriceFeed = new ChainlinkMock('LINK / USD');
+        priceFeeds.arbUsdPriceFeed = new ChainlinkMock('ARB / USD');
+        priceFeeds.wbtcUsdPriceFeed = new ChainlinkMock('WBTC / USD');
+        priceFeeds.tstUsdPriceFeed = new ChainlinkMock('TST / USD');
 
         _setPricesForPriceFeeds();
     }
@@ -301,7 +301,7 @@ contract Common is Test {
     function _deployProtocolContracts() internal {
         contracts.nftMetadataGenerator = new NFTMetadataGenerator();
 
-        contracts.tokenManager = new TokenManagerMock(bytes32("ETH"), address(priceFeeds.ethUsdPriceFeed));
+        contracts.tokenManager = new TokenManagerMock(bytes32('ETH'), address(priceFeeds.ethUsdPriceFeed));
 
         contracts.smartVaultIndex = new SmartVaultIndex();
     }
