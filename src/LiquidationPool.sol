@@ -362,6 +362,7 @@ contract LiquidationPool is ILiquidationPool {
                         // calculate the cost of the portion in euros
                         // @audit for now we will assume that it will return the value in correct decimals
                         // @audit the actual amount is divided by the collateral rate
+                        // @audit don't forge to submit the rounding down vulnerability
                         uint costInEuros = (
                             ((_portion * 10 ** (18 - asset.token.dec) * uint(assetPriceUsd)) / uint(priceEurUsd))
                                 * _hundredPC
@@ -373,6 +374,7 @@ contract LiquidationPool is ILiquidationPool {
                         // @audit if the new portion in EUROs is greater than the EUROs of the staker, then the portion will be reduced but why?
                         if (costInEuros > _position.EUROs) {
                             // @audit so the new portion is the portion corresponding to the euros stake in corresponding to the new portion stake
+                            // @audit so the above proportion was calculated from the stake() value but now from EUROs
                             _portion = (_portion * _position.EUROs) / costInEuros;
                             // console2.log('Position Euros: ', _position.EUROs);
                             // console2.log('New portion: ', _portion);

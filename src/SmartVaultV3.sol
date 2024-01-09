@@ -295,6 +295,7 @@ contract SmartVaultV3 is ISmartVault {
     }
 
     // @audit it will still cause an issue
+    // @audit weth should not be used as a collateral token other wise it will be converted to eth
     function swap(bytes32 _inToken, bytes32 _outToken, uint _amount) external onlyOwner {
         uint swapFee =
             (_amount * ISmartVaultManagerV3(manager).swapFeeRate()) / ISmartVaultManagerV3(manager).HUNDRED_PC();
