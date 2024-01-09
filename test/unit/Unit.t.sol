@@ -685,26 +685,13 @@ contract Unit is Common {
         uint tstAmount = 100 ether;
         uint eurosAmount = 1000 ether;
 
-        ///////////////////////////////////////////////////////////
-        ///      minting some tokens to alice and bob           ///
-        ///////////////////////////////////////////////////////////
-
-        tokens.eurosToken.mint(alice, eurosAmount);
-        tokens.tstToken.mint(alice, tstAmount);
+        /////////////////////////////////////////////////
+        ///      minting some tokens to bob           ///
+        /////////////////////////////////////////////////
 
         tokens.eurosToken.mint(bob, eurosAmount);
         tokens.tstToken.mint(bob, tstAmount);       
 
-        //////////////////////////////////////////////////////////////////////
-        ///      alice increases her stake with very little amount         ///
-        ///      just to be eligible for the liquidated assets             ///
-        //////////////////////////////////////////////////////////////////////
-
-        vm.startPrank(alice);
-        tokens.eurosToken.approve(address(contracts.liquidationPool), 1);
-        tokens.tstToken.approve(address(contracts.liquidationPool), 1);
-        contracts.liquidationPool.increasePosition(1, 1);
-        vm.stopPrank();
 
         ////////////////////////////////////////////////////////////
         ///     Bob increases his stake with full amount         ///
@@ -716,18 +703,12 @@ contract Unit is Common {
         contracts.liquidationPool.increasePosition(tstAmount, eurosAmount);
         vm.stopPrank();
 
-        ///////////////////////////////////////////////////////////////////////////
-        //   alice's position should have been increased with 1 wei of tokens   ///
-        //   And bob should have correct balance in his position               ///
-        ///////////////////////////////////////////////////////////////////////////
+        //////////////////////////////////////////////////////////////////////
+        //   bob should have correct balance in his position               ///
+        //////////////////////////////////////////////////////////////////////
 
-        (LiquidationPool.Position memory alicePosition, LiquidationPool.Reward[] memory alicesRewards) =
-            contracts.liquidationPool.position(alice);
         (LiquidationPool.Position memory bobPosition, LiquidationPool.Reward[] memory bobsRewards) =
             contracts.liquidationPool.position(bob);
-
-        assertEq(alicePosition.EUROs, 1, "Alice's euros amount are not eqaul");
-        assertEq(alicePosition.TST, 1, "Alice's tst amount are not equal");
 
         assertEq(bobPosition.EUROs, eurosAmount, "Bob's euros amount are not eqaul");
         assertEq(bobPosition.TST, tstAmount, "Bob's tst amount are not equal");
@@ -765,11 +746,8 @@ contract Unit is Common {
         //      alice called distributeAsset with the fake asset data.            ///
         /////////////////////////////////////////////////////////////////////////////
 
-        (alicePosition, alicesRewards) = contracts.liquidationPool.position(alice);
         (bobPosition, bobsRewards) = contracts.liquidationPool.position(bob);
 
-        console2.log("> Alices' EUROs balance Before fake liquidation: %s", alicePosition.EUROs);
-        console2.log("> Alices' TST balance Before fake liquidation: %s", alicePosition.TST);
         console2.log("> Bob's EUROs balance Before fake liquidation: %s", bobPosition.EUROs);
         console2.log("> Bob's TST balance Before fake liquidation: %s", bobPosition.TST);
 
@@ -778,23 +756,15 @@ contract Unit is Common {
         vm.stopPrank();
 
         /////////////////////////////////////////////////////////////////////////
-        //      getting the position of alice after the fake liquidation      ///
+        //      getting the positions after the fake liquidation              ///
         //      There will be no rewards for any user as well as their        ///
         //      euro's will be spent by the fake amount and added as          ///
-        //      a rewards for symbol: bytes32("") and address: address(0)     ///
-        //      which is unclaimable as address(0) is used to claim eth       ///
-        //      rewards.                                                      ///
+        //      a rewards for symbol: bytes32("") and address: staker         ///
+        //      which is unclaimable as it's not valid data                   ///
         /////////////////////////////////////////////////////////////////////////
 
-        (alicePosition, alicesRewards) = contracts.liquidationPool.position(alice);
         (bobPosition, bobsRewards) = contracts.liquidationPool.position(bob);
 
-        console2.log("> Alice's Rewards After fake liquidation: ");
-
-        for (uint i; i < alicesRewards.length; i++) {
-            console2.log('\tToken: %s', string(abi.encode(alicesRewards[i].symbol)));
-            console2.log('\tReward Earned: %s', alicesRewards[i].amount);
-        }
 
         console2.log("> Bob's Rewards After fake liquidation: ");
 
@@ -803,8 +773,6 @@ contract Unit is Common {
             console2.log('\tReward Earned: %s', bobsRewards[i].amount);
         }
         console2.log('\n');
-        console2.log("> Alices' EUROs balance After fake liquidation: %s", alicePosition.EUROs);
-        console2.log("> Alices' TST balance After fake liquidation: %s", alicePosition.TST);
         console2.log("> Bob's EUROs balance After fake liquidation: %s", bobPosition.EUROs);
         console2.log("> Bob's TST balance After fake liquidation: %s", bobPosition.TST);
 
