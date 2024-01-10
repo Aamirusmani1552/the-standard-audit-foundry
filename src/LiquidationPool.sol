@@ -326,8 +326,8 @@ contract LiquidationPool is ILiquidationPool {
     {
         consolidatePendingStakes();
         // @audit-info stale price can be used to manipulate the rewards: yes need to check the known issues
-        // @audit some price feeds has too long heartbeat and deviation rate that could lead to the loss of the tokens
-        // @audit for some assets, there is an active price feed on the L2s but not on mainnet or other chains
+        // @audit-info some price feeds has too long heartbeat and deviation rate that could lead to the loss of the tokens: added
+        // @audit-info for some assets, there is an active price feed on the L2s but not on mainnet or other chains: added
         (, int priceEurUsd,,,) = Chainlink.AggregatorV3Interface(eurUsd).latestRoundData();
 
         // @audit-info this only hold total stakes in the form of tst or euro or both. how is it calculated for the rewards because both represent different assets: both represent same value
@@ -360,7 +360,6 @@ contract LiquidationPool is ILiquidationPool {
                         uint _portion = (asset.amount * _positionStake) / stakeTotal;
                         // console2.log('Portion to be recieved: ', _portion);
                         // calculate the cost of the portion in euros
-                        // @audit for now we will assume that it will return the value in correct decimals
                         // @audit-info don't forge to submit the rounding down vulnerability: added
                         // @audit so divide by collateral mean's that there will be some rewards for the assets right?
                         uint costInEuros = (

@@ -121,7 +121,7 @@ contract LiquidationPoolManager is Ownable {
 
     // set the new pool fee percentage
 
-    // @audit no event emitted
+    // @audit-info no event emitted added
     // @audit-info same address can be added again
     function setPoolFeePercentage(uint32 _poolFeePercentage) external onlyOwner {
         poolFeePercentage = _poolFeePercentage;

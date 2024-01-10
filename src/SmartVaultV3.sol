@@ -16,7 +16,6 @@ contract SmartVaultV3 is ISmartVault {
 
     string private constant INVALID_USER = 'err-invalid-user';
     string private constant UNDER_COLL = 'err-under-coll';
-    // @audit constant naming convention not used
     uint8 private constant version = 2; // new version
     bytes32 private constant vaultType = bytes32('EUROs'); // type of vault. @audit-info will there be different types of vaults: yes
     bytes32 private immutable NATIVE;
@@ -34,7 +33,6 @@ contract SmartVaultV3 is ISmartVault {
     event EUROsBurned(uint amount, uint fee);
 
     constructor(bytes32 _native, address _manager, address _owner, address _euros, address _priceCalculator) {
-        // @audit address zero checks are not done
         NATIVE = _native;
         owner = _owner;
         manager = _manager;
@@ -68,7 +66,7 @@ contract SmartVaultV3 is ISmartVault {
     }
 
     // get the total collateral vaule in euros
-    // @audit wouldn't the vault be unnecessarily liquidated if the average price is less than the actual price?
+    // @audit-info wouldn't the vault be unnecessarily liquidated if the average price is less than the actual price? added
     function euroCollateral() private view returns (uint euros) {
         ITokenManager.Token[] memory acceptedTokens = getTokenManager().getAcceptedTokens();
         for (uint i = 0; i < acceptedTokens.length; i++) {
@@ -268,7 +266,6 @@ contract SmartVaultV3 is ISmartVault {
         // if weth is recieed then convert it to eth
         IWETH weth = IWETH(ISmartVaultManagerV3(manager).weth());
         // convert potentially received weth to eth
-        // @audit what if there is weth deposited in the vault? it would be converted to eth. would it be a problem?
         uint wethBalance = weth.balanceOf(address(this));
         if (wethBalance > 0) weth.withdraw(wethBalance);
     }
@@ -294,7 +291,6 @@ contract SmartVaultV3 is ISmartVault {
     }
 
     // @audit-info it will still cause an issue: added
-    // @audit weth should not be used as a collateral token other wise it will be converted to eth
     function swap(bytes32 _inToken, bytes32 _outToken, uint _amount) external onlyOwner {
         uint swapFee =
             (_amount * ISmartVaultManagerV3(manager).swapFeeRate()) / ISmartVaultManagerV3(manager).HUNDRED_PC();
