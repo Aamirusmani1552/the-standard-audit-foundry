@@ -12,9 +12,10 @@ import 'src/interfaces/ISmartVaultDeployer.sol';
 import 'src/interfaces/ISmartVaultIndex.sol';
 import 'src/interfaces/ISmartVaultManager.sol';
 import 'src/interfaces/ISmartVaultManagerV2.sol';
+import { console2 } from 'forge-std/console2.sol';
 
-// @audit ownable contract not initialized as well as erc721
-// @audit upgradeable version of initializable should be used
+// @audit-info ownable contract not initialized as well as erc721: it will only act as an update. there will be data already
+// @audit-info upgradeable version of initializable should be used
 contract SmartVaultManagerV5 is
     ISmartVaultManager,
     ISmartVaultManagerV2,
@@ -63,6 +64,7 @@ contract SmartVaultManagerV5 is
     }
 
     // returns the vaults owned by the msg.sender
+    // @audit-info is it compatible for multiple vault types? No different vaults will have differnet vault managers
     function vaults() external view returns (SmartVaultData[] memory) {
         // get the tokenIds owned by the msg.sender
         uint[] memory tokenIds = smartVaultIndex.getTokenIds(msg.sender);
@@ -81,8 +83,11 @@ contract SmartVaultManagerV5 is
         SmartVaultData[] memory vaultData = new SmartVaultData[](idsLength);
 
         // for each tokenId owned by the msg.sender, get the vault address and status
+        // @audit-info token Ids length starts from 1: Yes for the current codebase it doesn't cause issue. Maybe rewards part
+        console2.log("we are here");
         for (uint i = 0; i < idsLength; i++) {
             uint tokenId = tokenIds[i];
+            console2.log("Id is : ", tokenId);
             vaultData[i] = SmartVaultData({
                 tokenId: tokenId,
                 collateralRate: collateralRate,
@@ -94,13 +99,13 @@ contract SmartVaultManagerV5 is
         return vaultData;
     }
 
-    // @audit is it allowed to mint more than one vault for a particular msg.sender
+    // @audit-info is it allowed to mint more than one vault for a particular msg.sender: yes
     // mint new vault token to the msg.sender
-    // @audit the smart vault is an NFT, so that mean it is transferrable. But does the rewards and other amounts
-    // are transferred as well?
+    // @audit-info the smart vault is an NFT, so that mean it is transferrable. But does the rewards and other amounts
+    // are transferred as well? I think that should be checked by the user
     function mint() external returns (address vault, uint tokenId) {
         // increment the tokenId and mint the new vault
-        // @audit 0 token id will not be minted. will that cause any issues?
+        // @audit-info 0 token id will not be minted. will that cause any issues? will not be problem as supply is uint256 max
         tokenId = lastToken + 1;
         _safeMint(msg.sender, tokenId);
         lastToken = tokenId;
@@ -123,13 +128,12 @@ contract SmartVaultManagerV5 is
 
     // liquidate the vault with the given tokenId
     // can be called by the liquidator only
-    // @audit who is going to be the liquidator?
-    // @audit who is going to be benefitted from the liquidation? would that be protocol or the stakers?
+    // @audit-info who is going to be the liquidator: LiquidationPoolManager
+    // @audit-info who is going to be benefitted from the liquidation? would that be protocol or the stakers?: Only staker will be benefitted
     function liquidateVault(uint _tokenId) external onlyLiquidator {
         // get the vault address from the smart vault index
         ISmartVault vault = ISmartVault(smartVaultIndex.getVaultAddress(_tokenId));
 
-        // @audit should this be checked whether the vault is deployed for the tokenId?
 
         // try calling undercollateralised() on the vault to get the status
         try vault.undercollateralised() returns (bool _undercollateralised) {
@@ -218,5 +222,4 @@ contract SmartVaultManagerV5 is
         emit VaultTransferred(_tokenId, _from, _to);
     }
 
-    // @audit should there be a _gap variable?
 }

@@ -4,6 +4,46 @@ pragma solidity 0.8.17;
 import { Common, console2, LiquidationPool, SmartVaultV3 } from '../Common.t.sol';
 import { ILiquidationPoolManager } from 'src/interfaces/ILiquidationPoolManager.sol';
 import { ITokenManager } from 'src/interfaces/ITokenManager.sol';
+import {ApprovalRaceToken} from "@weird-erc20/src/Approval.sol";
+import {BlockableToken} from "@weird-erc20/src/BlockList.sol";
+import {TransferFeeToken} from "@weird-erc20/src/TransferFee.sol";
+
+
+contract ZeroApprovalToken is ApprovalRaceToken{
+    constructor (uint256 _totalSupply) public ApprovalRaceToken(_totalSupply){
+    }
+
+    function mint(address to, uint256 amount) public virtual {
+        balanceOf[to] += amount;
+    }
+}
+
+contract BlockListToken is BlockableToken{
+    constructor (uint256 _totalSupply) public BlockableToken(_totalSupply){
+    }
+
+    function mint(address to, uint256 amount) public virtual {
+        balanceOf[to] += amount;
+    }
+
+    
+    function safeTransferFrom(address from, address to, uint256 amount) public returns(bool){
+        require(!blocked[from], "blocked");
+        require(!blocked[to], "blocked");
+        console2.log("not blocked");
+        return super.transferFrom(from, to, amount);
+    }
+}
+
+
+contract FeeOnTransferToken is TransferFeeToken{
+    constructor (uint256 _totalSupply) public TransferFeeToken(_totalSupply, 1 ether){
+    }
+
+    function mint(address to, uint256 amount) public virtual {
+        balanceOf[to] += amount;
+    }
+}
 
 contract Unit is Common {
     function setUp() public override {
@@ -801,24 +841,27 @@ contract Unit is Common {
         console2.log("> Bob's TST Balance after he claims his Rewards: %s",bobPosition.TST);
     }
 
-    function test_rewardsDistribution() public {
-        ///////////////////////////////
-        ///     Setup               ///
-        ///////////////////////////////
-
-        uint tstAmount = 100 ether;
+    // @audit test passed
+    function test_zeroApprovalERC20NotSupported() public {
+        // setup
+        uint tstAmount = 1000 ether;
         uint eurosAmount = 1000 ether;
 
-        ///////////////////////////////////////////////////
-        ///      minting some tokens to alice           ///
-        ///////////////////////////////////////////////////
 
-        tokens.eurosToken.mint(alice, eurosAmount);
-        tokens.tstToken.mint(alice, tstAmount);
+        // minting some tokens to bobn and alice
+        tokens.eurosToken.mint(bob, eurosAmount);
+        tokens.tstToken.mint(bob, tstAmount); 
 
-        ///////////////////////////////////////////////
-        ///      alice increases her stake          ///
-        ///////////////////////////////////////////////
+        tokens.eurosToken.mint(alice, eurosAmount);      
+        tokens.tstToken.mint(alice, tstAmount); 
+
+
+        // both deposits their tokens in the pool
+        vm.startPrank(bob);
+        tokens.eurosToken.approve(address(contracts.liquidationPool), eurosAmount);
+        tokens.tstToken.approve(address(contracts.liquidationPool), tstAmount);
+        contracts.liquidationPool.increasePosition(tstAmount, eurosAmount);
+        vm.stopPrank();
 
         vm.startPrank(alice);
         tokens.eurosToken.approve(address(contracts.liquidationPool), eurosAmount);
@@ -826,108 +869,196 @@ contract Unit is Common {
         contracts.liquidationPool.increasePosition(tstAmount, eurosAmount);
         vm.stopPrank();
 
-        //////////////////////////////////////////////////////
-        //   alice's position should have been increased   ///
-        //////////////////////////////////////////////////////
-
-        (LiquidationPool.Position memory alicePosition, LiquidationPool.Reward[] memory alicesRewards) =
-            contracts.liquidationPool.position(alice);
-        assertEq(alicePosition.EUROs, eurosAmount, "Alice's euros amount are not eqaul");
-        assertEq(alicePosition.TST, tstAmount, "Alice's tst amount are not equal");
-
-        //////////////////////////////////////////////////////////
-        ///      skipping some time to consolidate stakes      ///
-        //////////////////////////////////////////////////////////
-
+        // skipping some time to consolidate rewards
         skip(block.timestamp + 1 weeks);
 
-        ////////////////////////////////////////////////////////////////////////
-        //      minting some ARBs to the LiquidationPoolManger               ///
-        ///     to represent the Liquidated assets                           ///
-        ////////////////////////////////////////////////////////////////////////
-        uint256 rewardsBalance = 0.4 ether;
-        tokens.arbToken.mint(address(contracts.liquidationPoolManager), rewardsBalance);
-        tokens.paxgToken.mint(address(contracts.liquidationPoolManager), rewardsBalance);
+        // deploying new ERC20 token
+        ZeroApprovalToken zeroApprovalToken = new ZeroApprovalToken(100000 ether);
 
-        /////////////////////////////////////////////////////////////////////////////
-        ///    Mocking LiquidationPoolManager approving the LiquidationPool       ///
-        ///    to spend the assets                                                ///
-        /////////////////////////////////////////////////////////////////////////////
+        // add the token to token manager
+        contracts.tokenManager.addAcceptedToken(address(zeroApprovalToken), address(priceFeeds.arbUsdPriceFeed));
 
-        vm.startPrank(address(contracts.liquidationPoolManager));
-        tokens.arbToken.approve(address(contracts.liquidationPool), rewardsBalance);
-        tokens.paxgToken.approve(address(contracts.liquidationPool), rewardsBalance);
-        vm.stopPrank();
+        // minting some erc20 to the LiquidationPoolManger
+        zeroApprovalToken.mint(address(contracts.liquidationPoolManager), 10 ether + 133 wei);
 
-        ////////////////////////////////////////////////////////
-        //           setting up data for mock call           ///
-        ////////////////////////////////////////////////////////
+        // approving to liquidation Pool Manager
+        vm.prank(address(contracts.liquidationPoolManager));
+        zeroApprovalToken.approve(address(contracts.liquidationPool), 10 ether + 133 wei);
 
+        // preparing data for the distribution mock call
         ILiquidationPoolManager.Asset[1] memory _assets;
 
-        // setting arb token data
-        // _assets[0] = ILiquidationPoolManager.Asset(
-        //     ITokenManager.Token({
-        //         symbol: 'ARB',
-        //         addr: address(tokens.arbToken),
-        //         dec: 18,
-        //         clAddr: address(priceFeeds.arbUsdPriceFeed),
-        //         clDec: 8
-        //     }),
-        //     rewardsBalance
-        // );
-
+        // this balance will left some dust approval
+        uint256 rewardsBalance =  10 ether + 133 wei;
         _assets[0] = ILiquidationPoolManager.Asset(
             ITokenManager.Token({
-                symbol: 'PAXG',
-                addr: address(tokens.paxgToken),
+                symbol: 'TKN',
+                addr: address(zeroApprovalToken), 
                 dec: 18,
-                clAddr: address(priceFeeds.paxgUsdPriceFeed),
+                clAddr: address(priceFeeds.arbUsdPriceFeed),
                 clDec: 8
             }),
             rewardsBalance
         );
 
         assets.push(_assets[0]);
-        // assets.push(_assets[1]);
 
-        /////////////////////////////////////////////////////////////////////////////
-        //      mocking distribute asset call from the liquidationPoolManager     ///
-        /////////////////////////////////////////////////////////////////////////////
-
-        console2.log("> Alice's ARB tokens Balance before Distributing Rewards: %s\n", tokens.arbToken.balanceOf(alice));
-
+        
+        // mocking call to distribute assets
         vm.startPrank(address(contracts.liquidationPoolManager));
-        // @audit what if collateral rate is set to zero
         contracts.liquidationPool.distributeAssets(assets, uint(constants.DEFAULT_COLLATERAL_RATE), 100_000);
+        vm.stopPrank();   
+
+
+        // minting some more tokens to liquidationPoolManger
+        zeroApprovalToken.mint(address(contracts.liquidationPoolManager), 1 ether);
+
+        // LPM approves tries to approve LP but will fail as the old dust approval is still left
+        vm.prank(address(contracts.liquidationPoolManager));
+        vm.expectRevert("unsafe-approve");
+        zeroApprovalToken.approve(address(contracts.liquidationPool), 1 ether);
+    }
+
+    // @audit test passed
+    function test_blockListTokensWillCauseDistributionAssetIssue() public {
+        // setup
+        uint tstAmount = 1000 ether;
+        uint eurosAmount = 1000 ether;
+
+
+        // minting some tokens to bobn and alice
+        tokens.eurosToken.mint(bob, eurosAmount);
+        tokens.tstToken.mint(bob, tstAmount); 
+
+        tokens.eurosToken.mint(alice, eurosAmount);      
+        tokens.tstToken.mint(alice, tstAmount); 
+
+
+        // both deposits their tokens in the pool
+        vm.startPrank(bob);
+        tokens.eurosToken.approve(address(contracts.liquidationPool), eurosAmount);
+        tokens.tstToken.approve(address(contracts.liquidationPool), tstAmount);
+        contracts.liquidationPool.increasePosition(tstAmount, eurosAmount);
         vm.stopPrank();
 
-        ////////////////////////////////////////////////////////////////////
-        //      getting the position of alice after the liquidation      ///
-        //      There should be rewards in ARBs token. Also the EURO     ///
-        //      balance of the Alice should be 0 as the amount should    ///
-        //      have been spent to buy the liquidated assets.            ///
-        ////////////////////////////////////////////////////////////////////
+        vm.startPrank(alice);
+        tokens.eurosToken.approve(address(contracts.liquidationPool), eurosAmount);
+        tokens.tstToken.approve(address(contracts.liquidationPool), tstAmount);
+        contracts.liquidationPool.increasePosition(tstAmount, eurosAmount);
+        vm.stopPrank();
 
-        (alicePosition, alicesRewards) = contracts.liquidationPool.position(alice);
+        // skipping some time to consolidate rewards
+        skip(block.timestamp + 1 weeks);
 
-        bool hasRewards;
+        // deploying new ERC20 token
+        BlockListToken blockListToken = new BlockListToken(100000 ether);
 
-        console2.log("> Alice's Rewards After liquidation: ");
+        // add the token to token manager
+        contracts.tokenManager.addAcceptedToken(address(blockListToken), address(priceFeeds.arbUsdPriceFeed));
 
-        for (uint i; i < alicesRewards.length; i++) {
-            if (alicesRewards[i].amount > 0) {
-                console2.log('\tToken: %s', string(abi.encode(alicesRewards[i].symbol)));
-                console2.log('\tReward Earned: %s\n', alicesRewards[i].amount);
-                hasRewards = true;
-            }
-        }
+        // minting some erc20 to the LiquidationPoolManger
+        blockListToken.mint(address(contracts.liquidationPoolManager), 10 ether );
+
+        // approving to liquidation Pool Manager
+        vm.prank(address(contracts.liquidationPoolManager));
+        blockListToken.approve(address(contracts.liquidationPool), 10 ether);
+
+        // preparing data for the distribution mock call
+        ILiquidationPoolManager.Asset[1] memory _assets;
+
+        // this balance will left some dust approval
+        uint256 rewardsBalance =  10 ether;
+        _assets[0] = ILiquidationPoolManager.Asset(
+            ITokenManager.Token({
+                symbol: 'TKN',
+                addr: address(blockListToken), 
+                dec: 18,
+                clAddr: address(priceFeeds.arbUsdPriceFeed),
+                clDec: 8
+            }),
+            rewardsBalance
+        );
+
+        assets.push(_assets[0]);
+
+        // adding alice to blocklist
+        blockListToken.block(alice);
+
+        // mocking call to distribute assets
+        vm.startPrank(address(contracts.liquidationPoolManager));
+        contracts.liquidationPool.distributeAssets(assets, uint(constants.DEFAULT_COLLATERAL_RATE), 100_000);
+        vm.stopPrank();   
+
+        // alice tries to claim the rewards
+        vm.startPrank(alice);
+        vm.expectRevert("blocked");
+        contracts.liquidationPool.claimRewards();
+        vm.stopPrank();
+    }
+
+    // @audit test passed
+    function test_FeeOnTransferTokensNotSupported() public {
+        // setup
+        uint tstAmount = 1000 ether;
+        uint eurosAmount = 1000 ether;
 
 
-        require(hasRewards, 'No rewards are earned by the staker');
+        // minting some tokens to alice
+        tokens.eurosToken.mint(alice, eurosAmount);      
+        tokens.tstToken.mint(alice, tstAmount); 
 
-        console2.log(alicePosition.EUROs);
+        // alice deposits her tokens
+        vm.startPrank(alice);
+        tokens.eurosToken.approve(address(contracts.liquidationPool), eurosAmount);
+        tokens.tstToken.approve(address(contracts.liquidationPool), tstAmount);
+        contracts.liquidationPool.increasePosition(tstAmount, eurosAmount);
+        vm.stopPrank();
 
+        // skipping some time to consolidate rewards
+        skip(block.timestamp + 1 weeks);
+
+        // deploying new ERC20 token
+        FeeOnTransferToken feeOnTransferToken = new FeeOnTransferToken(100000 ether);
+
+        // add the token to token manager
+        contracts.tokenManager.addAcceptedToken(address(feeOnTransferToken), address(priceFeeds.arbUsdPriceFeed));
+
+        // minting some erc20 to the LiquidationPoolManger
+        feeOnTransferToken.mint(address(contracts.liquidationPoolManager), 10 ether );
+
+        // approving to liquidation Pool Manager
+        vm.prank(address(contracts.liquidationPoolManager));
+        feeOnTransferToken.approve(address(contracts.liquidationPool), 10 ether);
+
+        // preparing data for the distribution mock call
+        ILiquidationPoolManager.Asset[1] memory _assets;
+
+        // this balance will left some dust approval
+        uint256 rewardsBalance =  10 ether;
+        _assets[0] = ILiquidationPoolManager.Asset(
+            ITokenManager.Token({
+                symbol: 'TKN',
+                addr: address(feeOnTransferToken), 
+                dec: 18,
+                clAddr: address(priceFeeds.arbUsdPriceFeed),
+                clDec: 8
+            }),
+            rewardsBalance
+        );
+
+        assets.push(_assets[0]);
+
+
+        // mocking call to distribute assets
+        vm.startPrank(address(contracts.liquidationPoolManager));
+        contracts.liquidationPool.distributeAssets(assets, uint(constants.DEFAULT_COLLATERAL_RATE), 100_000);
+        vm.stopPrank();   
+
+        // alice tries to claim the rewards
+        vm.startPrank(alice);
+        vm.expectRevert("insufficient-balance");
+        contracts.liquidationPool.claimRewards();
+        vm.stopPrank();
     }
 
 

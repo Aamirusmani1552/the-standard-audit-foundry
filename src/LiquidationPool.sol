@@ -58,7 +58,7 @@ contract LiquidationPool is ILiquidationPool {
         _;
     }
 
-    // @audit don't forget to add the openzeppelin contract version dependency issue in the report
+    // @audit-info don't forget to add the openzeppelin contract version dependency issue in the report: added
     // lesser from the two will be returned so that the stake of lesser one is incentivized
     // @audit-info but what if the there is a balance in TST but not in EUROs? Would a staker get the rewards: there should be amount
     // in both EUROs and TST to get the rewards
@@ -77,7 +77,7 @@ contract LiquidationPool is ILiquidationPool {
     }
 
     // returns the total TST of the holders. Both TST staked and TST pending
-    // @audit why is that when the rewards are distributed, they are given to only those who have mature stakes. But when the rewards are calculated they consider the stakes that are not mature yet?
+    // @audit-info why is that when the rewards are distributed, they are given to only those who have mature stakes. But when the rewards are calculated they consider the stakes that are not mature yet: design choice
     function getTstTotal() private view returns (uint _tst) {
         for (uint i = 0; i < holders.length; i++) {
             _tst += positions[holders[i]].TST;
@@ -118,8 +118,8 @@ contract LiquidationPool is ILiquidationPool {
         _position.EUROs += _pendingEUROs;
         _position.TST += _pendingTST;
 
-        // @audit if the position holds TST, why some percentage of manager's EURO balance is added to the position?
-        // @audit position shows the incorrect balance of the staker. the pool receive percentage of the total balance not whole balance
+        // @audit-info if the position holds TST, why some percentage of manager's EURO balance is added to the position? - they represent undistributed fees to the staker
+        // @audit-info position shows the incorrect balance of the staker. the pool receive percentage of the total balance not whole balance: added
         if (_position.TST > 0) {
             _position.EUROs += (IERC20(EUROs).balanceOf(manager) * _position.TST) / getTstTotal();
         }
@@ -147,8 +147,9 @@ contract LiquidationPool is ILiquidationPool {
     // This last pending stake will be moved to the index of the pending stake to be deleted
     // and then the last pending stake will be deleted
 
-    // @audit would that still work if there is only one pending staker
-    // @audit wouldn't it cause DoS if the number of holders is too large?
+    // @audit-info would that still work if there is only one pending staker: yes
+    // @audit-info wouldn't it cause DoS if the number of holders is too large: yes it will
+    // @audit-info no natspac added: added
     function deletePendingStake(uint _i) private {
         for (uint i = _i; i < pendingStakes.length - 1; i++) {
             pendingStakes[i] = pendingStakes[i + 1];
@@ -157,7 +158,7 @@ contract LiquidationPool is ILiquidationPool {
     }
 
     // add the holder to the holders array if not already in the array
-    // @audit would it cause dos as well when holders are too high
+    // @audit-info would it cause dos as well when holders are too high: known issue
     function addUniqueHolder(address _holder) private {
         for (uint i = 0; i < holders.length; i++) {
             if (holders[i] == _holder) return;
@@ -204,7 +205,7 @@ contract LiquidationPool is ILiquidationPool {
         }
 
         // add the staker to the pending stakers
-        // @audit does block.timestamp works differently on different chains?
+        // @audit-info does block.timestamp works differently on different chains. Yeah but it will not matter in this case
         pendingStakes.push(PendingStake(msg.sender, block.timestamp, _tstVal, _eurosVal));
         // add the staker to the holders if not present already
         addUniqueHolder(msg.sender);
@@ -237,16 +238,16 @@ contract LiquidationPool is ILiquidationPool {
             positions[msg.sender].EUROs -= _eurosVal;
         }
 
-        // @audit shouldn't it check if there is a pending position for the msg.sender before deleting?
+        // @audit-info shouldn't it check if there is a pending position for the msg.sender before deleting: yes added to findings
 
         // if the position is empty, delete the position
         if (empty(positions[msg.sender])) deletePosition(positions[msg.sender]);
     }
 
     // claim the rewards
-    // anyone can call it. @audit can a not staker call it and get back rewards?
-    // @audit can i claim rewards more than once
-    // @audit if a token is removed from the token manager, then the rewards will be lost
+    // anyone can call it. @audit-info can a not staker call it and get back rewards: nope
+    // @audit-info can i claim rewards more than once: Nope, the rewards value are deleted before the claim
+    // @audit-info if a token is removed from the token manager, then the rewards will be lost: added
     function claimRewards() external {
         // geth the accepted tokens from token manager
         ITokenManager.Token[] memory _tokens = ITokenManager(tokenManager).getAcceptedTokens();
@@ -268,7 +269,7 @@ contract LiquidationPool is ILiquidationPool {
                     require(_sent);
                     // if token is not native, transfer the token to the user
                 } else {
-                    // @audit ERC20 safeTransfer should be used
+                    // @audit-info ERC20 safeTransfer should be used: know issue
                     IERC20(_token.addr).transfer(msg.sender, _rewardAmount);
                 }
             }
@@ -283,15 +284,15 @@ contract LiquidationPool is ILiquidationPool {
             IERC20(EUROs).safeTransferFrom(msg.sender, address(this), _amount);
 
             // iterate over the holders and add the fees to the rewards
-            // @audit distribute fees will only be received by the TST holder
-            // @audit why fee is only distributed on the basis of TST and not EUROs
+            // @audit-info distribute fees will only be received by the TST holder: yes, design choice
+            // @audit-info why fee is only distributed on the basis of TST and not EUROs: desing choice
             for (uint i = 0; i < holders.length; i++) {
                 address _holder = holders[i];
                 positions[_holder].EUROs += (_amount * positions[_holder].TST) / tstTotal;
             }
 
             // iterate over the pending stakes and add the fees to the rewards
-            // @audit why is this distributed to pending stakes? because total stakes also has pending stakes. But should it be
+            // @audit-info why is this distributed to pending stakes? because total stakes also has pending stakes: No issue here
             for (uint i = 0; i < pendingStakes.length; i++) {
                 pendingStakes[i].EUROs += (_amount * pendingStakes[i].TST) / tstTotal;
             }
@@ -308,13 +309,13 @@ contract LiquidationPool is ILiquidationPool {
         }
     }
 
-    // @audit if this transfer the assets to the different addresses then the liquidtea function should transfer the tokens to
-    // this contract right?
-    // @audit can't i just multiply my rewards by just calling it
-    // @audit if there will be a lot of holder it will not work due to gas greif right?
-    // @audit will it burn some tokens of the users
-    // @audit will it not cause the DoS if the number of holders are too high?
-    // @audit can't I just pass any value to steal the tokens?
+    // @audit-info if this transfer the assets to the different addresses then the liquidated function should transfer the tokens to
+    // this contract right: yes and it does
+    // @audit-info can't i just multiply my rewards by just calling it: it allows for manipulation
+    // @audit-info if there will be a lot of holder it will not work due to gas greif right: yes but have to check in know issues
+    // @audit-info will it burn some tokens of the users: yes the euros amount that is used to buy the liquidated assets at discount
+    // @audit-info will it not cause the DoS if the number of holders are too high: yes it will have to check in known issues
+    // @audit-info can't I just pass any value to steal the tokens: yes added to final report
     function distributeAssets(
         ILiquidationPoolManager.Asset[] memory _assets,
         uint _collateralRate,
@@ -324,12 +325,12 @@ contract LiquidationPool is ILiquidationPool {
         payable
     {
         consolidatePendingStakes();
-        // @audit stale price can be used to manipulate the rewards
+        // @audit-info stale price can be used to manipulate the rewards: yes need to check the known issues
         // @audit some price feeds has too long heartbeat and deviation rate that could lead to the loss of the tokens
         // @audit for some assets, there is an active price feed on the L2s but not on mainnet or other chains
         (, int priceEurUsd,,,) = Chainlink.AggregatorV3Interface(eurUsd).latestRoundData();
 
-        // @audit this only hold total stakes in the form of tst or euro or both. how is it calculated for the rewards because both represent different assets
+        // @audit-info this only hold total stakes in the form of tst or euro or both. how is it calculated for the rewards because both represent different assets: both represent same value
         uint stakeTotal = getStakeTotal();
         uint burnEuros;
         uint nativePurchased;
@@ -348,10 +349,9 @@ contract LiquidationPool is ILiquidationPool {
                     // if the asset amount is greater than 0, calculate the rewards and transfer the rewards to the staker
                     if (asset.amount > 0) {
                         // get the asset's price in USD from chainlink
-                        // @audit not price feed sanity check
+                        // @audit-info not price feed sanity check: added
                         (, int assetPriceUsd,,,) = Chainlink.AggregatorV3Interface(asset.token.clAddr).latestRoundData();
                         // calculate the portion of the asset for the staker based on his stake
-                        // @audit but what if his _position stake is greater than the stake total
                         // console2.log('\nrewards: ', string(abi.encode(asset.token.symbol)));
                         // console2.log('asset amount: ', asset.amount);
                         // console2.log('Position stake', _positionStake);
@@ -361,8 +361,8 @@ contract LiquidationPool is ILiquidationPool {
                         // console2.log('Portion to be recieved: ', _portion);
                         // calculate the cost of the portion in euros
                         // @audit for now we will assume that it will return the value in correct decimals
-                        // @audit the actual amount is divided by the collateral rate
-                        // @audit don't forge to submit the rounding down vulnerability
+                        // @audit-info don't forge to submit the rounding down vulnerability: added
+                        // @audit so divide by collateral mean's that there will be some rewards for the assets right?
                         uint costInEuros = (
                             ((_portion * 10 ** (18 - asset.token.dec) * uint(assetPriceUsd)) / uint(priceEurUsd))
                                 * _hundredPC
@@ -371,14 +371,10 @@ contract LiquidationPool is ILiquidationPool {
                         // console2.log('price Eur to USD: ', priceEurUsd);
                         // console2.log('Cost in euros: ', costInEuros);
 
-                        // @audit if the new portion in EUROs is greater than the EUROs of the staker, then the portion will be reduced but why?
                         if (costInEuros > _position.EUROs) {
-                            // @audit so the new portion is the portion corresponding to the euros stake in corresponding to the new portion stake
-                            // @audit so the above proportion was calculated from the stake() value but now from EUROs
                             _portion = (_portion * _position.EUROs) / costInEuros;
                             // console2.log('Position Euros: ', _position.EUROs);
                             // console2.log('New portion: ', _portion);
-                            // @audit why new cost In EUROs is the EUROs of the staker
                             costInEuros = _position.EUROs;
                             // console2.log('New cost in euros: %s \n', costInEuros);
                             // console2.log(
@@ -386,18 +382,14 @@ contract LiquidationPool is ILiquidationPool {
                             //     (_portion * 10 ** (18 - asset.token.dec) * uint(assetPriceUsd)) / uint(priceEurUsd)
                             // );
                         }
-                        // @audit if the new protion is greater than the asset amount, then the portion will be reduced but why?
                         _position.EUROs -= costInEuros;
                         // add the rewards to the rewards mapping for the holder
 
                         rewards[abi.encodePacked(_position.holder, asset.token.symbol)] += _portion;
-                        // @audit why is it burning the EUROs
                         burnEuros += costInEuros;
-                        // @audit if the asset is native, add the portion to the native purchased. What is the purpose?
                         if (asset.token.addr == address(0)) {
                             nativePurchased += _portion;
                         } else {
-                            // @audit transfer the portion of the asset to this address. But why?
                             IERC20(asset.token.addr).safeTransferFrom(manager, address(this), _portion);
                         }
                     }
@@ -407,9 +399,8 @@ contract LiquidationPool is ILiquidationPool {
             // update the position of the holder
             positions[holders[j]] = _position;
         }
-        // @audit burn the euros. Why in the first place it was burned?
         if (burnEuros > 0) IEUROs(EUROs).burn(address(this), burnEuros);
-        // @audit return the unpurchased native tokens to the manager. Again why?
+
         returnUnpurchasedNative(_assets, nativePurchased);
     }
 }

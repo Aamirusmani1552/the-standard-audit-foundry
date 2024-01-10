@@ -18,9 +18,9 @@ contract SmartVaultV3 is ISmartVault {
     string private constant UNDER_COLL = 'err-under-coll';
     // @audit constant naming convention not used
     uint8 private constant version = 2; // new version
-    bytes32 private constant vaultType = bytes32('EUROs'); // type of vault. @audit will there be different types of vaults?
-    bytes32 private immutable NATIVE; // @audit will that be an address zero?
-    address public immutable manager; // will be the smart vault manager
+    bytes32 private constant vaultType = bytes32('EUROs'); // type of vault. @audit-info will there be different types of vaults: yes
+    bytes32 private immutable NATIVE;
+    address public immutable manager; // will be the smart vault manager: yes
     IEUROs public immutable EUROs; // EUROs token
     IPriceCalculator public immutable calculator; // price calculator used for tokens conversion
 
@@ -68,6 +68,7 @@ contract SmartVaultV3 is ISmartVault {
     }
 
     // get the total collateral vaule in euros
+    // @audit wouldn't the vault be unnecessarily liquidated if the average price is less than the actual price?
     function euroCollateral() private view returns (uint euros) {
         ITokenManager.Token[] memory acceptedTokens = getTokenManager().getAcceptedTokens();
         for (uint i = 0; i < acceptedTokens.length; i++) {
@@ -130,7 +131,7 @@ contract SmartVaultV3 is ISmartVault {
 
     // liquidate the vault by transferring all the assets to the protocol
     // can be called by vault manager only
-    // @audit if accepted token is removed from the token manager, would it not cause an issue?
+    // @audit-info if accepted token is removed from the token manager, would it not cause an issue? No here. only in liquidation pool
     function liquidate() external onlyVaultManager {
         require(undercollateralised(), 'err-not-liquidatable');
         liquidated = true;
@@ -202,7 +203,7 @@ contract SmartVaultV3 is ISmartVault {
     }
 
     // vault owner will call this to mint EUROs against the collateral
-    // @audit how much would the user be able to recover if he decides to clost the vault?
+    // @audit-info how much would the user be able to recover if he decides to clost the vault? Only his amount - withdraw fee
     function mint(address _to, uint _amount) external onlyOwner ifNotLiquidated {
         uint fee = (_amount * ISmartVaultManagerV3(manager).mintFeeRate()) / ISmartVaultManagerV3(manager).HUNDRED_PC();
         require(fullyCollateralised(_amount + fee), UNDER_COLL);
@@ -286,15 +287,13 @@ contract SmartVaultV3 is ISmartVault {
         ISmartVaultManagerV3 _manager = ISmartVaultManagerV3(manager);
         // calculate the required collateral value for the minted tokens
         uint requiredCollateralValue = (minted * _manager.collateralRate()) / _manager.HUNDRED_PC();
-        // @audit so if I have 1000 euros of collateral and I want to swap those tokens, the minimum amount out would be
-        // equal to zero? this will still cause an issue
         uint collateralValueMinusSwapValue = euroCollateral() - calculator.tokenToEur(getToken(_inTokenSymbol), _amount);
         return collateralValueMinusSwapValue >= requiredCollateralValue
             ? 0
             : calculator.eurToToken(getToken(_outTokenSymbol), requiredCollateralValue - collateralValueMinusSwapValue);
     }
 
-    // @audit it will still cause an issue
+    // @audit-info it will still cause an issue: added
     // @audit weth should not be used as a collateral token other wise it will be converted to eth
     function swap(bytes32 _inToken, bytes32 _outToken, uint _amount) external onlyOwner {
         uint swapFee =
